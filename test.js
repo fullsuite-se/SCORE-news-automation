@@ -28,9 +28,23 @@ async function scrapeArticles() {
         // Wait for article elements to load
         console.log('8. Waiting for article elements...');
         await page.waitForSelector('xpath=/html/body/div[5]/div/div[1]/main/div/div[1]/div/a[1]');
+        
+        // /html/body/div[5]/div/div[1]/main/div/div[1]/div/a[1]
+        // /html/body/div[5]/div/div[1]/main/div/div[1]/div/a[2]
+        // therefore increase by a[i]
+        
         // Find all article links using XPATH
         console.log('10. Finding article links...');
-        const articleLinks = await page.$$('xpath=/html/body/div[5]/div/div[1]/main/div/div[1]/div/a[1]');
+        const articleLinks = [];
+
+        for (let j = 0; j < 10; j++) {
+            var xpath = `xpath=/html/body/div[5]/div/div[1]/main/div/div[1]/div/a[${j+1}]`;
+            var elements = await page.$$(xpath);
+            if (elements.length > 0) {
+                articleLinks.push(elements[0]);
+            }
+        }
+        
         if (articleLinks.length === 0) {
             console.log('11. No article links found!');
             return;
