@@ -144,3 +144,5 @@ async function scrapeArticles() {
 // Run the scraper
 console.log('Starting climate change articles scraper...');
 scrapeArticles();
+
+//hi
