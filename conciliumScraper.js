@@ -84,7 +84,7 @@ async function conciliumScraper() {
       }).join('\n') +
       `\n</articles>\n`;
 
-    const filePath = path.join(__dirname, 'latest-articles.xml');
+    const filePath = path.join(__dirname, 'conciliumArticles.xml');
     fs.writeFileSync(filePath, xmlContent, 'utf8');
     console.log(`\n✅ XML saved to ${filePath}`);
     console.log(`Total articles saved: ${articlesData.length}`);

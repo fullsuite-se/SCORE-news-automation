@@ -1,0 +1,124 @@
+const puppeteer = require('puppeteer');
+const fs = require('fs');
+const path = require('path');
+
+async function icpenScraper() {
+  const browser = await puppeteer.launch({ headless: false, slowMo: 50 });
+  const page = await browser.newPage();
+
+  const url = 'https://icpen.org/news';
+
+  try {
+    console.log('Navigating to ICPEN News page...');
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+
+    await page.waitForSelector('div.teaser-icon, div.field.field--name-news-title.field--type-ds.field--label-hidden.field__item', { timeout: 15000 });
+    console.log('Found article containers.');
+
+    const articles = await page.evaluate(() => {
+      const results = [];
+
+      function getDateText(element) {
+        const parent = element.closest('.views-row');
+        if (!parent) return null;
+
+        const dateDiv =
+          parent.querySelector('div.field--spaced.date-author.field.field--name-news-item-submitted-by.field--type-ds.field--label-hidden.field__item') ||
+          parent.querySelector('div.date-author.field.field--name-news-item-submitted-by.field--type-ds.field--label-hidden.field__item');
+
+        return dateDiv ? dateDiv.textContent.trim() : null;
+      }
+
+      const teaserDivs = Array.from(document.querySelectorAll('div.teaser-icon'));
+      teaserDivs.forEach(teaser => {
+        const titleDiv = teaser.querySelector('div.text--snug.field.field--name-news-title.field--type-ds.field--label-hidden.field__item');
+        if (!titleDiv) return;
+
+        const h2 = titleDiv.querySelector('h2');
+        if (!h2) return;
+
+        const link = h2.querySelector('a');
+        if (!link) return;
+
+        const title = link.textContent.trim();
+        const url = link.href;
+        const date = getDateText(teaser) || 'Date not found';
+
+        if (title && url) {
+          results.push({ title, url, date });
+        }
+      });
+
+      const fieldDivs = Array.from(document.querySelectorAll('div.field.field--name-news-title.field--type-ds.field--label-hidden.field__item'));
+      fieldDivs.forEach(div => {
+        const h2 = div.querySelector('h2');
+        if (!h2) return;
+        const link = h2.querySelector('a');
+        if (!link) return;
+
+        const title = link.textContent.trim();
+        const url = link.href;
+        const date = getDateText(div) || 'Date not found';
+
+        if (title && url) {
+          results.push({ title, url, date });
+        }
+      });
+
+      // Deduplicate articles by URL
+      const seen = new Set();
+      return results.filter(article => {
+        if (seen.has(article.url)) return false;
+        seen.add(article.url);
+        return true;
+      });
+    });
+
+    if (!articles.length) {
+      console.log('No articles found.');
+      return;
+    }
+
+    // Build XML
+    let xml = '<?xml version="1.0" encoding="UTF-8"?>\n<articles>\n';
+    articles.forEach(({ title, url, date }) => {
+      xml += `  <article>\n`;
+      xml += `    <title>${escapeXml(title)}</title>\n`;
+      xml += `    <date>${escapeXml(date)}</date>\n`;
+      xml += `    <url>${escapeXml(url)}</url>\n`;
+      xml += `  </article>\n`;
+    });
+    xml += `</articles>`;
+
+    const filename = path.join(process.cwd(), 'ICPEN.xml');
+    fs.writeFileSync(filename, xml, 'utf8');
+
+    console.log(`\n✅ Saved ${articles.length} articles to ${filename}`);
+    articles.forEach((a, i) => {
+      console.log(`\n#${i + 1}`);
+      console.log(`Title: ${a.title}`);
+      console.log(`Date: ${a.date}`);
+      console.log(`URL: ${a.url}`);
+    });
+
+  } catch (err) {
+    console.error('Error scraping:', err.message);
+  } finally {
+    console.log('\nClosing browser...');
+    await browser.close();
+  }
+}
+
+function escapeXml(unsafe) {
+  return unsafe.replace(/[<>&'"]/g, c => {
+    switch (c) {
+      case '<': return '&lt;';
+      case '>': return '&gt;';
+      case '&': return '&amp;';
+      case '\'': return '&apos;';
+      case '"': return '&quot;';
+    }
+  });
+}
+
+icpenScraper();
