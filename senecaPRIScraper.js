@@ -15,7 +15,7 @@ async function senecaPRIScraper() {
     await page.waitForSelector('div.post.col-3', { timeout: 15000 });
     console.log('Post containers found.');
 
-    // Extract all articles
+    //Finds articles to scrape within the HTML elements
     const articles = await page.evaluate(() => {
       const posts = Array.from(document.querySelectorAll('div.post.col-3'));
       return posts.map(post => {
@@ -29,7 +29,7 @@ async function senecaPRIScraper() {
         const date = dateEl ? dateEl.textContent.trim() : null;
 
         return { title, url, date };
-      }).filter(article => article.title && article.url); // Filter out incomplete articles
+      }).filter(article => article.title && article.url);
     });
 
     if (articles.length === 0) {
@@ -37,23 +37,16 @@ async function senecaPRIScraper() {
       return;
     }
 
-    // Build XML content
-    let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<articles>\n`;
-    articles.forEach(({ title, url, date }) => {
-      xml += `  <article>\n`;
-      xml += `    <title>${title.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</title>\n`;
-      xml += `    <date>${date ? date.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') : ''}</date>\n`;
-      xml += `    <url>${url}</url>\n`;
-      xml += `  </article>\n`;
-    });
-    xml += `</articles>`;
+    //Gets only 10 articles
+    const limitedArticles = articles.slice(0, 10);
 
-    const filename = 'senecaPRI.xml';
+    //Creates JSON file
+    const filename = 'senecaPRI.json';
     const fullPath = path.join(process.cwd(), filename);
 
-    fs.writeFileSync(fullPath, xml, 'utf8');
-    console.log(`\nXML file saved at: ${fullPath}`);
-    console.log('Number of articles saved:', articles.length);
+    fs.writeFileSync(fullPath, JSON.stringify(limitedArticles, null, 2), 'utf8');
+    console.log(`\n JSON file saved at: ${fullPath}`);
+    console.log('Number of articles saved:', limitedArticles.length);
 
   } catch (err) {
     console.error('Error scraping:', err);

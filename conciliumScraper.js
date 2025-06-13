@@ -27,11 +27,12 @@ async function conciliumScraper() {
     }
 
     await page.waitForSelector('li.gsc-excerpt-item', { timeout: 15000 });
-    const articles = await page.$$('li.gsc-excerpt-item');
+    const articles = (await page.$$('li.gsc-excerpt-item')).slice(0, 10);
     console.log(`Found ${articles.length} articles on the page.`);
 
     const articlesData = [];
 
+    //Finds articles in the HTML elements
     for (const article of articles) {
       const title = await article.$eval('a.gsc-excerpt-item__title', el => el.textContent.trim());
       const href = await article.$eval('a.gsc-excerpt-item__title', el => el.getAttribute('href'));
@@ -72,21 +73,10 @@ async function conciliumScraper() {
       articlesData.push({ title, publishedAt, url: fullUrl });
     }
 
-    // Generate XML content
-    const xmlContent =
-      `<?xml version="1.0" encoding="UTF-8"?>\n<articles>\n` +
-      articlesData.map(article => {
-        return `  <article>\n` +
-               `    <title>${escapeXML(article.title)}</title>\n` +
-               `    <date>${escapeXML(article.publishedAt)}</date>\n` +
-               `    <url>${escapeXML(article.url)}</url>\n` +
-               `  </article>`;
-      }).join('\n') +
-      `\n</articles>\n`;
-
-    const filePath = path.join(__dirname, 'conciliumArticles.xml');
-    fs.writeFileSync(filePath, xmlContent, 'utf8');
-    console.log(`\n✅ XML saved to ${filePath}`);
+    // Write to JSON
+    const jsonPath = path.join(__dirname, 'conciliumArticles.json');
+    fs.writeFileSync(jsonPath, JSON.stringify(articlesData, null, 2), 'utf8');
+    console.log(`\n JSON saved to ${jsonPath}`);
     console.log(`Total articles saved: ${articlesData.length}`);
 
   } catch (error) {
@@ -98,19 +88,6 @@ async function conciliumScraper() {
       console.log('Browser closed.');
     }, 10000);
   }
-}
-
-// Escape special characters for XML
-function escapeXML(str) {
-  return str.replace(/[<>&'"]/g, char => {
-    switch (char) {
-      case '<': return '&lt;';
-      case '>': return '&gt;';
-      case '&': return '&amp;';
-      case '\'': return '&apos;';
-      case '"': return '&quot;';
-    }
-  });
 }
 
 conciliumScraper();

@@ -42,6 +42,7 @@ async function scmpScraper() {
         const containers = document.querySelectorAll(selector);
         const results = [];
 
+        //HTML elements where the article information is in
         containers.forEach(container => {
           try {
             const link = container.querySelector(
@@ -63,6 +64,7 @@ async function scmpScraper() {
         return results;
       }
 
+      //Dividers found in the website
       const selectors = [
         'div.e102obc92.e1daqvjd0.css-1oukeou.e2fukww19',
         'div.e10l40di1.e1daqvjd0.css-grxlrd.efy545l13',
@@ -83,21 +85,17 @@ async function scmpScraper() {
       return;
     }
 
-    console.log(` Found ${articles.length} articles. Writing to XML...`);
+    //Limits to 10 articles
+    const limitedArticles = articles.slice(0, 10);
 
-    let xml = '<?xml version="1.0" encoding="UTF-8"?>\n<articles>\n';
-    for (const { title, url, date } of articles) {
-      xml += `  <article>\n`;
-      xml += `    <title>${title.replace(/&/g, '&amp;')}</title>\n`;
-      xml += `    <date>${date}</date>\n`;
-      xml += `    <url>${url}</url>\n`;
-      xml += `  </article>\n`;
-    }
-    xml += '</articles>';
-
-    const filename = 'scmp-esg-articles.xml';
-    fs.writeFileSync(path.join(process.cwd(), filename), xml, 'utf8');
-    console.log(` XML saved as ${filename}`);
+    //Creates JSON file
+    const filename = 'scmp-esg-articles.json';
+    fs.writeFileSync(
+      path.join(process.cwd(), filename),
+      JSON.stringify(limitedArticles, null, 2),
+      'utf8'
+    );
+    console.log(` JSON saved as ${filename}`);
 
   } catch (err) {
     console.error(' Error scraping:', err.message);
@@ -108,5 +106,3 @@ async function scmpScraper() {
 }
 
 scmpScraper();
-
-//maximum without manual scrolling is 22, user scrolling is 44. It works anyway.

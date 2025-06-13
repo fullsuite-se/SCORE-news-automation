@@ -79,22 +79,15 @@ async function icpenScraper() {
       return;
     }
 
-    // Build XML
-    let xml = '<?xml version="1.0" encoding="UTF-8"?>\n<articles>\n';
-    articles.forEach(({ title, url, date }) => {
-      xml += `  <article>\n`;
-      xml += `    <title>${escapeXml(title)}</title>\n`;
-      xml += `    <date>${escapeXml(date)}</date>\n`;
-      xml += `    <url>${escapeXml(url)}</url>\n`;
-      xml += `  </article>\n`;
-    });
-    xml += `</articles>`;
+    // Limit to 10 articles
+    const limitedArticles = articles.slice(0, 10);
 
-    const filename = path.join(process.cwd(), 'ICPEN.xml');
-    fs.writeFileSync(filename, xml, 'utf8');
+    // Write JSON
+    const filename = path.join(process.cwd(), 'ICPEN.json');
+    fs.writeFileSync(filename, JSON.stringify(limitedArticles, null, 2), 'utf8');
 
-    console.log(`\n✅ Saved ${articles.length} articles to ${filename}`);
-    articles.forEach((a, i) => {
+    console.log(`\n Saved ${limitedArticles.length} articles to ${filename}`);
+    limitedArticles.forEach((a, i) => {
       console.log(`\n#${i + 1}`);
       console.log(`Title: ${a.title}`);
       console.log(`Date: ${a.date}`);
@@ -107,18 +100,6 @@ async function icpenScraper() {
     console.log('\nClosing browser...');
     await browser.close();
   }
-}
-
-function escapeXml(unsafe) {
-  return unsafe.replace(/[<>&'"]/g, c => {
-    switch (c) {
-      case '<': return '&lt;';
-      case '>': return '&gt;';
-      case '&': return '&amp;';
-      case '\'': return '&apos;';
-      case '"': return '&quot;';
-    }
-  });
 }
 
 icpenScraper();

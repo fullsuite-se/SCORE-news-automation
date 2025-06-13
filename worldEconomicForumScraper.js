@@ -21,8 +21,7 @@ async function worldEconomicForumScraper() {
 
       return links.map(link => {
         let dateText = null;
-        // Attempt to find a nearby date/time element
-        const dateElement = link.closest('div').querySelector('time, span, div');
+        const dateElement = link.closest('div')?.querySelector('time, span, div');
         if (dateElement) dateText = dateElement.textContent.trim();
 
         return {
@@ -38,27 +37,17 @@ async function worldEconomicForumScraper() {
       return;
     }
 
-    // Build XML content
-    let xmlContent = '<?xml version="1.0" encoding="UTF-8"?>\n<articles>\n';
+    // Limit to 10 articles
+    const limitedArticles = articles.slice(0, 10);
 
-    for (const article of articles) {
-      xmlContent += `  <article>\n`;
-      xmlContent += `    <title>${escapeXml(article.title)}</title>\n`;
-      xmlContent += `    <date>${escapeXml(article.date)}</date>\n`;
-      xmlContent += `    <url>${escapeXml(article.url)}</url>\n`;
-      xmlContent += `  </article>\n`;
-    }
-
-    xmlContent += '</articles>\n';
-
-    // Save XML to file
-    const filename = path.join(process.cwd(), 'worldEconomicForum.xml');
-    fs.writeFileSync(filename, xmlContent, 'utf8');
-    console.log(`Saved ${articles.length} articles to XML file: ${filename}`);
+    // Save JSON to file
+    const filename = path.join(process.cwd(), 'worldEconomicForum.json');
+    fs.writeFileSync(filename, JSON.stringify(limitedArticles, null, 2), 'utf8');
+    console.log(`\n Saved ${limitedArticles.length} articles to JSON file: ${filename}`);
 
     // Log articles summary
-    console.log(`\nScraped ${articles.length} articles:\n`);
-    articles.forEach((article, i) => {
+    console.log(`\nScraped ${limitedArticles.length} articles:\n`);
+    limitedArticles.forEach((article, i) => {
       console.log(`#${i + 1}`);
       console.log(`Title: ${article.title}`);
       console.log(`Date: ${article.date}`);
@@ -72,19 +61,6 @@ async function worldEconomicForumScraper() {
     console.log('Closing browser...');
     await browser.close();
   }
-}
-
-// Helper to escape XML special chars
-function escapeXml(unsafe) {
-  return unsafe.replace(/[<>&'"]/g, c => {
-    switch (c) {
-      case '<': return '&lt;';
-      case '>': return '&gt;';
-      case '&': return '&amp;';
-      case '\'': return '&apos;';
-      case '"': return '&quot;';
-    }
-  });
 }
 
 worldEconomicForumScraper();
