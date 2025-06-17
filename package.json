@@ -2,5 +2,12 @@
   "dependencies": {
     "puppeteer": "^24.10.0",
     "puppeteer-core": "^24.10.0"
+  },
+  "scripts": {
+  "vercel-build": "echo 'No build needed'"
+  },
+  "puppeteer": {
+    "skip_chromium_download": false
   }
 }
+
