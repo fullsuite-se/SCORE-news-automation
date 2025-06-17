@@ -3,17 +3,15 @@ const fs = require('fs');
 const path = require('path');
 
 async function icpenScraper() {
-  const browser = await puppeteer.launch({ headless: false, slowMo: 50 });
+  const browser = await puppeteer.launch({ headless: true, slowMo: 50 });
   const page = await browser.newPage();
 
   const url = 'https://icpen.org/news';
 
   try {
-    console.log('Navigating to ICPEN News page...');
     await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
 
     await page.waitForSelector('div.teaser-icon, div.field.field--name-news-title.field--type-ds.field--label-hidden.field__item', { timeout: 15000 });
-    console.log('Found article containers.');
 
     const articles = await page.evaluate(() => {
       const results = [];
@@ -83,21 +81,14 @@ async function icpenScraper() {
     const limitedArticles = articles.slice(0, 10);
 
     // Write JSON
-    const filename = path.join(process.cwd(), 'ICPEN.json');
-    fs.writeFileSync(filename, JSON.stringify(limitedArticles, null, 2), 'utf8');
-
-    console.log(`\n Saved ${limitedArticles.length} articles to ${filename}`);
-    limitedArticles.forEach((a, i) => {
-      console.log(`\n#${i + 1}`);
-      console.log(`Title: ${a.title}`);
-      console.log(`Date: ${a.date}`);
-      console.log(`URL: ${a.url}`);
-    });
+    const filename = 'ICPEN.json';
+    const fullPath = path.join(process.cwd(), filename);
+    fs.writeFileSync(fullPath, JSON.stringify(limitedArticles, null, 2), 'utf8');
+    console.log(`\n JSON saved at: ${fullPath}`);
 
   } catch (err) {
     console.error('Error scraping:', err.message);
   } finally {
-    console.log('\nClosing browser...');
     await browser.close();
   }
 }

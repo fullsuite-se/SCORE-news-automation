@@ -3,13 +3,12 @@ const fs = require('fs');
 const path = require('path');
 
 async function worldEconomicForumScraper() {
-  const browser = await puppeteer.launch({ headless: false, slowMo: 50 });
+  const browser = await puppeteer.launch({ headless: true, slowMo: 50 });
   const page = await browser.newPage();
 
   const url = 'https://www.weforum.org/stories/sustainable-development/';
 
   try {
-    console.log('Navigating to page...');
     await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
 
     // Wait for dynamic content to load
@@ -35,30 +34,27 @@ async function worldEconomicForumScraper() {
     if (!articles.length) {
       console.log('No articles found!');
       return;
+
+      //deduplication
+         const uniqueKey = `${title}||${url}`;
+        if (!seen.has(uniqueKey)) {
+          seen.add(uniqueKey);
+          results.push({ title, url, date });
+        }
     }
 
     // Limit to 10 articles
     const limitedArticles = articles.slice(0, 10);
 
     // Save JSON to file
-    const filename = path.join(process.cwd(), 'worldEconomicForum.json');
-    fs.writeFileSync(filename, JSON.stringify(limitedArticles, null, 2), 'utf8');
-    console.log(`\n Saved ${limitedArticles.length} articles to JSON file: ${filename}`);
-
-    // Log articles summary
-    console.log(`\nScraped ${limitedArticles.length} articles:\n`);
-    limitedArticles.forEach((article, i) => {
-      console.log(`#${i + 1}`);
-      console.log(`Title: ${article.title}`);
-      console.log(`Date: ${article.date}`);
-      console.log(`URL: ${article.url}`);
-      console.log('-------------------------');
-    });
+    const filename = 'worldEconomicForum.json';
+    const fullPath = path.join(process.cwd(), filename);
+    fs.writeFileSync(fullPath, JSON.stringify(limitedArticles, null, 2), 'utf8');
+    console.log(`\nJSON file saved at: ${fullPath}`);
 
   } catch (error) {
     console.error('Error scraping:', error);
   } finally {
-    console.log('Closing browser...');
     await browser.close();
   }
 }

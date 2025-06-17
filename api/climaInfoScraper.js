@@ -9,12 +9,10 @@ async function climaInfoScraper() {
   const url = `${baseUrl}/noticias/`;
 
   try {
-    console.log('Navigating to ClimaInfo News page...');
     await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
 
     // Wait for posts to load
     await page.waitForSelector('h3.brxe-vzxxxz.brxe-heading.feed_post__title');
-    console.log('Post containers found.');
 
     // Extract article URLs and titles
     const articles = await page.evaluate(() => {
@@ -26,6 +24,13 @@ async function climaInfoScraper() {
           url: aTag.href
         };
       }).filter(Boolean);
+
+        //deduplication
+         const uniqueKey = `${title}||${url}`;
+        if (!seen.has(uniqueKey)) {
+          seen.add(uniqueKey);
+          results.push({ title, url, date });
+        }
     });
 
     if (!articles.length) {
@@ -41,12 +46,10 @@ async function climaInfoScraper() {
     const fullPath = path.join(process.cwd(), filename);
     fs.writeFileSync(fullPath, JSON.stringify(limitedArticles, null, 2), 'utf8');
     console.log(`\nJSON file saved at: ${fullPath}`);
-    console.log('Number of articles saved:', limitedArticles.length);
 
   } catch (err) {
     console.error('Error scraping:', err);
   } finally {
-    console.log('Closing browser...');
     await browser.close();
   }
 }

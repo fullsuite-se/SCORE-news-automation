@@ -3,17 +3,15 @@ const fs = require('fs');
 const path = require('path');
 
 async function greenpeacePHScraper() {
-  const browser = await puppeteer.launch({ headless: false, slowMo: 50 });
+  const browser = await puppeteer.launch({ headless: true, slowMo: 50 });
   const page = await browser.newPage();
   const url = 'https://www.greenpeace.org/philippines/press/';
 
   try {
-    console.log('Navigating to Greenpeace Philippines Press page...');
     await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
 
     // Wait for the article containers to load
     await page.waitForSelector('div.query-list-item-body', { timeout: 15000 });
-    console.log('Article containers found.');
 
     // Scrape articles
     const articles = await page.evaluate(() => {
@@ -33,6 +31,13 @@ async function greenpeacePHScraper() {
     if (articles.length === 0) {
       console.log('No articles found!');
       return;
+
+      //other deduplication
+         const uniqueKey = `${title}||${url}`;
+        if (!seen.has(uniqueKey)) {
+          seen.add(uniqueKey);
+          results.push({ title, url, date });
+        }
     }
 
     // Limit to 10 results
@@ -43,11 +48,9 @@ async function greenpeacePHScraper() {
     const fullPath = path.join(process.cwd(), filename);
     fs.writeFileSync(fullPath, JSON.stringify(limitedArticles, null, 2), 'utf8');
     console.log(`\nJSON file saved at: ${fullPath}`);
-    console.log('Number of articles saved:', limitedArticles.length);
   } catch (err) {
     console.error('Error scraping:', err);
   } finally {
-    console.log('Closing browser...');
     await browser.close();
   }
 }
