@@ -2,7 +2,7 @@ const puppeteer = require('puppeteer');
 const fs = require('fs');
 const path = require('path');
 
-async function straitTimesScraper() {
+module.exports = async (req, res) => {
     const browser = await puppeteer.launch({
         headless: true,
         slowMo: 50,
@@ -102,9 +102,7 @@ async function straitTimesScraper() {
     } catch (error) {
         console.error('An error occurred:', error.message);
     } finally {
-        setTimeout(async () => {
-            await browser.close();
-        }, 30000);
+        await browser.close();
     }
 }
 
