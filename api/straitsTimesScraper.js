@@ -29,7 +29,7 @@ async function straitTimesScraper() {
         }
 
         if (articleLinks.length === 0) {
-            return;
+            return res.status(200).json({ message: 'No articles found' });
         }
 
         const articles = [];
@@ -84,6 +84,9 @@ async function straitTimesScraper() {
             return true;
         });
 
+        res.status(200).json(deduplicated);
+        
+        /*
         const filename = 'straitTimes.json';
         const fullPath = path.join(process.cwd(), filename);
 
@@ -94,6 +97,8 @@ async function straitTimesScraper() {
             console.error('Error saving file:', error.message);
         }
 
+        */
+
     } catch (error) {
         console.error('An error occurred:', error.message);
     } finally {
@@ -103,4 +108,3 @@ async function straitTimesScraper() {
     }
 }
 
-straitTimesScraper();
