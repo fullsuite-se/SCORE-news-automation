@@ -6,6 +6,7 @@ module.exports = async (req, res) => {
     const browser = await puppeteer.launch({
         headless: true,
         slowMo: 50,
+        executablePath: '/opt/bin/chromium',
         args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
 
