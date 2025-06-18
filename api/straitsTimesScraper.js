@@ -5,7 +5,8 @@ const path = require('path');
 async function straitTimesScraper() {
     const browser = await puppeteer.launch({
         headless: true,
-        slowMo: 50
+        slowMo: 50,
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
     });
 
     try {
