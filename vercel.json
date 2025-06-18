@@ -1,0 +1,8 @@
+{
+  "functions": {
+    "api/straitsTimesScraper.js": {
+      "memory": 1536,
+      "maxDuration": 20
+    }
+  }
+}
