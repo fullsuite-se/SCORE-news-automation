@@ -5,8 +5,10 @@ async function getBrowserModules() {
   
   const chromium = await import('@sparticuz/chromium-min');
 
-  const executablePath = isLambda 
-    ? chromium.executablePath 
+  const isServerless = !!chromium.executablePath;
+
+  const executablePath = isServerless
+    ? chromium.executablePath
     : (await import('puppeteer')).executablePath();
 
   return { puppeteer, chromium, executablePath};
