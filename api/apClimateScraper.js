@@ -7,13 +7,13 @@ async function getBrowserModules() {
   
   const chromium = await import('@sparticuz/chromium-min');
 
-  return { puppeteer, 
-    chromium, 
-    executablePath: isLambda ? chromium.executablePath : null };
+  const executablePath =  isLambda ? chromium.executablePath : null
+
+  return { puppeteer, chromium, executablePath};
 }
 
 module.exports = async (req, res) => {
-  const { puppeteer, chromium } = await getBrowserModules();
+  const { puppeteer, chromium, executablePath } = await getBrowserModules();
   
   const launchOptions = isLambda
     ? {
