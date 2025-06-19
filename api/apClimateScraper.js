@@ -17,7 +17,7 @@ module.exports = async (req, res) => {
       slowMo: 50,
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
       ...(isLambda && {
-        executablePath: await chromium.executablePath(),
+        executablePath: chromium.executablePath,
         defaultViewport: chromium.defaultViewport,
       })
     });
