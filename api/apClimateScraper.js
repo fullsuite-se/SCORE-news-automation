@@ -1,11 +1,11 @@
 const isLambda = !!process.env.AWS_REGION;
-const puppeteer = isLambda ? require('puppeteer-core') : require('puppeteer');
+const puppeteer = isLambda ? import('puppeteer-core') : import('puppeteer');
 const chromium = require('@sparticuz/chromium');
 const fs = require('fs');
 const path = require('path');
 
 module.exports = async (req, res) => {
-  const browser = await puppeteer.launch({
+  const browser = await puppeteer.default.launch({
     headless: true,
     slowMo: 50,
     args: ['--no-sandbox', '--disable-setuid-sandbox']
