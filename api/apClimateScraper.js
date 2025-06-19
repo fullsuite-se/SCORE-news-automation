@@ -1,54 +1,79 @@
 const isLambda = !!process.env.AWS_REGION;
 
 async function getBrowserModules() {
-  const puppeteer = await import('puppeteer-core')  
+  const puppeteer = await import('puppeteer-core');
   const { default: ChromiumClass } = await import('@sparticuz/chromium-min');
 
- console.log('--- Debugging ChromiumClass object ---');
- console.log('Type of ChromiumClass:', typeof ChromiumClass);
- console.log('Keys of ChromiumClass:', Object.keys(ChromiumClass));
- console.log('Full ChromiumClass object:', ChromiumClass); 
- console.log('ChromiumClass.executablePath is a function:', typeof ChromiumClass.executablePath === 'function');
- console.log('ChromiumClass.args:', ChromiumClass.args);
- console.log('ChromiumClass.defaultViewport:', ChromiumClass.defaultViewport);
- console.log('--- End ChromiumClass Debug ---');
+  console.log('--- Debugging ChromiumClass object ---');
+  console.log('Type of ChromiumClass:', typeof ChromiumClass);
+  console.log('Keys of ChromiumClass:', Object.keys(ChromiumClass));
+  console.log('Full ChromiumClass object:', ChromiumClass);
+  console.log('ChromiumClass.executablePath is a function:', typeof ChromiumClass.executablePath === 'function');
+  console.log('ChromiumClass.args:', ChromiumClass.args);
+  console.log('ChromiumClass.defaultViewport:', ChromiumClass.defaultViewport);
+  console.log('--- End ChromiumClass Debug ---');
 
+  // Correctly call executablePath as a function to get the path string
+  // Ensure we await the result as executablePath() is async
+  let executablePathValue = null;
+  if (typeof ChromiumClass.executablePath === 'function') {
+    executablePathValue = await ChromiumClass.executablePath();
+  } else {
+    // Fallback in case it's not a function (though logs suggest it is), but it should ideally be a function returning the path
+    executablePathValue = ChromiumClass.executablePath;
+  }
 
-  return { puppeteer, 
+  return {
+    puppeteer,
     chromiumArgs: ChromiumClass.args, // Renamed to avoid confusion
     chromiumDefaultViewport: ChromiumClass.defaultViewport, // Renamed
-    executablePath: executablePathString};
+    executablePath: executablePathValue // Use the correctly obtained path
+  };
 }
 
 export default async function (req, res) {
+  // Destructure the correctly named variables from getBrowserModules
   const { puppeteer, chromiumArgs, chromiumDefaultViewport, executablePath } = await getBrowserModules();
 
-  
-  // --- ADD THIS LOGGING ---
+  // --- Crucial Debugging and Validation ---
   console.log('--- Puppeteer Launch Debug Info ---');
   console.log('isLambda:', isLambda);
-  console.log('chromium.args:', chromium.args);
-  console.log('chromium.defaultViewport:', chromium.defaultViewport);
-  console.log('Executable Path before launch:', executablePath); 
+  console.log('chromiumArgs (from @sparticuz/chromium-min):', chromiumArgs);
+  console.log('chromiumDefaultViewport (from @sparticuz/chromium-min):', chromiumDefaultViewport);
+  console.log('Executable Path (from @sparticuz/chromium-min):', executablePath);
   console.log('--- End Debug Info ---');
-  // --- END LOGGING ---
+
+  // Explicitly check if executablePath is valid when in a Lambda environment
+  if (isLambda && (!executablePath || typeof executablePath !== 'string' || executablePath.trim() === '')) {
+    console.error('ERROR: In Lambda environment, executablePath is not valid:', executablePath);
+    return res.status(500).json({
+      error: 'Puppeteer launch failed: Missing or invalid Chromium executable path for Lambda environment.',
+      details: 'Ensure @sparticuz/chromium-min is correctly deployed and can locate the Chromium binary.'
+    });
+  }
 
   const launchOptions = isLambda
     ? {
-        args: chromium.args,
-        defaultViewport: chromium.defaultViewport,
-        executablePath: executablePath,
-        headless: true,
+        args: chromiumArgs, // Use the correct variable name
+        defaultViewport: chromiumDefaultViewport, // Use the correct variable name
+        executablePath: executablePath, // Use the correctly obtained path
+        headless: true, // Chromium for serverless is always headless
       }
     : {
+        // For local development, Puppeteer will typically find Chrome/Chromium if installed
         headless: true,
         slowMo: 50,
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
+        // executablePath is not strictly needed here if a system browser is found,
+        // but can be added for explicit local path if desired.
       };
 
-  const browser = await puppeteer.launch(launchOptions);
+  let browser; // Declare browser outside try-block for finally access
 
   try {
+    console.log('Attempting to launch Puppeteer with options:', JSON.stringify(launchOptions, null, 2));
+    browser = await puppeteer.launch(launchOptions);
+
     const page = await browser.newPage();
     const url = 'https://apnews.com/climate-and-environment';
 
@@ -113,12 +138,12 @@ export default async function (req, res) {
 
     res.status(200).json(deduplicated);
 
-
   } catch (err) {
-    console.error('Error scraping:', err);
+    console.error('Error during scraping or Puppeteer launch:', err);
     res.status(500).json({ error: 'Scraping failed', details: err.message });
   } finally {
-    await browser.close();
+    if (browser) { // Ensure browser exists before trying to close it
+      await browser.close();
+    }
   }
-};
-
+}
