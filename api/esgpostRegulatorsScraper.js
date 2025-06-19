@@ -60,45 +60,45 @@ export default async function (req, res) {
       };
 
   let browser;
-  const url = 'https://esgpost.com/category/sustainable-finance/';
+  const url = 'https://esgpost.com/category/regulators/';
 
   try {
     console.log('Attempting to launch Puppeteer with options:', JSON.stringify(launchOptions, null, 2));
     browser = await puppeteer.launch(launchOptions);
     const page = await browser.newPage();
 
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 0 });
-
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
     await page.waitForSelector('div.cs-entry__inner.cs-entry__content', { timeout: 10000 });
 
     const articles = await page.evaluate(() => {
-      const nodes = document.querySelectorAll('div.cs-entry__inner.cs-entry__content');
+      const containers = document.querySelectorAll('div.cs-entry__inner.cs-entry__content');
       const seen = new Set();
       const results = [];
 
-      nodes.forEach(node => {
-        const titleTag = node.querySelector('h2.cs-entry__title a');
-        const dateTag = node.querySelector('div.cs-entry__post-meta div.cs-meta-date');
+      for (const container of containers) {
+        const titleEl = container.querySelector('h2.cs-entry__title > a');
+        const dateEl = container.querySelector('div.cs-entry__post-meta div.cs-meta-date');
 
-        if (!titleTag) return;
+        if (titleEl && dateEl) {
+          const title = titleEl.textContent.trim();
+          const url = titleEl.href.trim();
+          const date = dateEl.textContent.trim();
 
-        const url = titleTag.href.trim();
-        const title = titleTag.textContent.trim();
-        const date = dateTag ? dateTag.textContent.trim() : 'Date not found';
-
-        const uniqueKey = `${title}||${url}`;
-        if (!seen.has(uniqueKey)) {
-          seen.add(uniqueKey);
-          results.push({ title, url, date });
+          if (!seen.has(url)) {
+            seen.add(url);
+            results.push({ title, date, url });
+          }
         }
-      });
 
-      console.log(`Found ${results.length} articles on listing page.`);
-      return results.slice(0, 10);
+        if (results.length >= 10) break;
+      }
+
+      console.log(`Found ${results.length} articles.`);
+      return results;
     });
 
     if (articles.length === 0) {
-      console.log('No articles found!');
+      console.warn('No articles found.');
       return res.status(200).json({ message: 'No articles found' });
     }
 
@@ -106,7 +106,7 @@ export default async function (req, res) {
     res.status(200).json(articles);
 
   } catch (err) {
-    console.error('Error during scraping:', err.message);
+    console.error('Scraping failed:', err.message);
     res.status(500).json({ error: 'Scraping failed', details: err.message });
   } finally {
     if (browser) {
