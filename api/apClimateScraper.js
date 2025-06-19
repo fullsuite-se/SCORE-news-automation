@@ -2,7 +2,13 @@ const isLambda = !!process.env.AWS_REGION;
 
 async function getBrowserModules() {
   const puppeteer = await import('puppeteer-core')  
-  const chromium = await import('@sparticuz/chromium-min');
+  const { default: chromium } = await import('@sparticuz/chromium-min');
+
+  console.log('--- Debugging chromium object ---');
+  console.log('Type of chromium (after destructure):', typeof chromium);
+  console.log('Keys of chromium (after destructure):', Object.keys(chromium));
+  console.log('Full chromium object (after destructure):', chromium); 
+  console.log('--- End chromium Debug ---');
 
   const executablePath = await chromium.executablePath;
 
@@ -13,11 +19,12 @@ export default async function (req, res) {
   const { puppeteer, chromium, executablePath } = await getBrowserModules();
   
   // --- ADD THIS LOGGING ---
-  console.log('--- Debugging chromium object ---');
-  console.log('Type of chromium:', typeof chromium);
-  console.log('Keys of chromium:', Object.keys(chromium));
-  console.log('Full chromium object:', chromium); 
-  console.log('--- End chromium Debug ---');
+  cconsole.log('--- Puppeteer Launch Debug Info ---');
+  console.log('isLambda:', isLambda);
+  console.log('chromium.args:', chromium.args);
+  console.log('chromium.defaultViewport:', chromium.defaultViewport);
+  console.log('Executable Path before launch:', executablePath); 
+  console.log('--- End Debug Info ---');
   // --- END LOGGING ---
 
   const launchOptions = isLambda
