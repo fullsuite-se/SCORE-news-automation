@@ -19,7 +19,7 @@ export default async function (req, res) {
   const { puppeteer, chromium, executablePath } = await getBrowserModules();
   
   // --- ADD THIS LOGGING ---
-  cconsole.log('--- Puppeteer Launch Debug Info ---');
+  console.log('--- Puppeteer Launch Debug Info ---');
   console.log('isLambda:', isLambda);
   console.log('chromium.args:', chromium.args);
   console.log('chromium.defaultViewport:', chromium.defaultViewport);
