@@ -12,6 +12,15 @@ async function getBrowserModules() {
 module.exports = async (req, res) => {
   const { puppeteer, chromium, executablePath } = await getBrowserModules();
   
+  // --- ADD THIS LOGGING ---
+    console.log('--- Puppeteer Launch Debug Info ---');
+    console.log('isLambda:', isLambda);
+    console.log('chromium.args:', chromium.args);
+    console.log('chromium.defaultViewport:', chromium.defaultViewport);
+    console.log('Executable Path before launch:', executablePath); // <-- CRITICAL LOG
+    console.log('--- End Debug Info ---');
+    // --- END LOGGING ---
+    
   const launchOptions = isLambda
     ? {
         args: chromium.args,
