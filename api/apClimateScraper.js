@@ -2,7 +2,7 @@ const isLambda = !!process.env.AWS_REGION;
 
 async function getBrowserModules() {
   const puppeteer = await import('puppeteer-core')  
-  const { default: chromium } = await import('@sparticuz/chromium-min');
+  const { default: ChromiumClass } = await import('@sparticuz/chromium-min');
 
  console.log('--- Debugging ChromiumClass object ---');
  console.log('Type of ChromiumClass:', typeof ChromiumClass);
