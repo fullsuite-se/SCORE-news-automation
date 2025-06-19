@@ -8,5 +8,8 @@
   },
   "puppeteer": {
     "skip_chromium_download": false
+  },
+  "devDependencies": {
+    "@sparticuz/chromium": "^137.0.1"
   }
 }
