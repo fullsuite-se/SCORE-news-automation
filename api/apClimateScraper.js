@@ -12,15 +12,20 @@ async function getBrowserModules() {
 module.exports = async (req, res) => {
   const { puppeteer, chromium } = await getBrowserModules();
   
-  const browser = await puppeteer.launch({
-      headless: true,
-      slowMo: 50,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-      ...(isLambda && {
-        executablePath: chromium.executablePath,
+  const launchOptions = isLambda
+    ? {
+        args: chromium.args,
         defaultViewport: chromium.defaultViewport,
-      })
-    });
+        executablePath: chromium.executablePath,
+        headless: chromium.headless,
+      }
+    : {
+        headless: true,
+        slowMo: 50,
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+      };
+
+  const browser = await puppeteer.launch(launchOptions);
 
   try {
     const page = await browser.newPage();
