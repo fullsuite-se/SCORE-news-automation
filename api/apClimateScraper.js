@@ -1,62 +1,64 @@
-const isLambda = !!process.env.AWS_REGION;
+// On Vercel, process.env.AWS_REGION is typically set as well,
+// so this variable will correctly be true for Vercel deployments.
+const isVercelEnvironment = !!process.env.AWS_REGION; // Or check for process.env.VERCEL
 
 async function getBrowserModules() {
   const puppeteer = await import('puppeteer-core');
-  const { default: ChromiumClass } = await import('@sparticuz/chromium-min');
+  // *** CHANGE: Import from @sparticuz/chromium (without -min) ***
+  const { default: ChromiumClass } = await import('@sparticuz/chromium');
 
-  console.log('--- Debugging ChromiumClass object ---');
+  console.log('--- Debugging ChromiumClass object (Vercel) ---');
   console.log('Type of ChromiumClass:', typeof ChromiumClass);
   console.log('Keys of ChromiumClass:', Object.keys(ChromiumClass));
   console.log('Full ChromiumClass object:', ChromiumClass);
+  // @sparticuz/chromium's executablePath is typically a function
   console.log('ChromiumClass.executablePath is a function:', typeof ChromiumClass.executablePath === 'function');
   console.log('ChromiumClass.args:', ChromiumClass.args);
   console.log('ChromiumClass.defaultViewport:', ChromiumClass.defaultViewport);
-  console.log('--- End ChromiumClass Debug ---');
+  console.log('--- End ChromiumClass Debug (Vercel) ---');
 
-  // Correctly call executablePath as a function to get the path string
-  // Ensure we await the result as executablePath() is async
   let executablePathValue = null;
   if (typeof ChromiumClass.executablePath === 'function') {
+    // This is typically how @sparticuz/chromium provides the path
     executablePathValue = await ChromiumClass.executablePath();
   } else {
-    // Fallback in case it's not a function (though logs suggest it is), but it should ideally be a function returning the path
+    // Fallback, though less likely for this library
     executablePathValue = ChromiumClass.executablePath;
   }
 
   return {
     puppeteer,
-    chromiumArgs: ChromiumClass.args, // Renamed to avoid confusion
-    chromiumDefaultViewport: ChromiumClass.defaultViewport, // Renamed
-    executablePath: executablePathValue // Use the correctly obtained path
+    chromiumArgs: ChromiumClass.args,
+    chromiumDefaultViewport: ChromiumClass.defaultViewport,
+    executablePath: executablePathValue
   };
 }
 
 export default async function (req, res) {
-  // Destructure the correctly named variables from getBrowserModules
   const { puppeteer, chromiumArgs, chromiumDefaultViewport, executablePath } = await getBrowserModules();
 
-  // --- Crucial Debugging and Validation ---
-  console.log('--- Puppeteer Launch Debug Info ---');
-  console.log('isLambda:', isLambda);
-  console.log('chromiumArgs (from @sparticuz/chromium-min):', chromiumArgs);
-  console.log('chromiumDefaultViewport (from @sparticuz/chromium-min):', chromiumDefaultViewport);
-  console.log('Executable Path (from @sparticuz/chromium-min):', executablePath);
-  console.log('--- End Debug Info ---');
+  // --- Crucial Debugging and Validation for Vercel ---
+  console.log('--- Puppeteer Launch Debug Info (Vercel) ---');
+  console.log('isVercelEnvironment:', isVercelEnvironment);
+  console.log('chromiumArgs (from @sparticuz/chromium):', chromiumArgs);
+  console.log('chromiumDefaultViewport (from @sparticuz/chromium):', chromiumDefaultViewport);
+  console.log('Executable Path (from @sparticuz/chromium):', executablePath);
+  console.log('--- End Debug Info (Vercel) ---');
 
-  // Explicitly check if executablePath is valid when in a Lambda environment
-  if (isLambda && (!executablePath || typeof executablePath !== 'string' || executablePath.trim() === '')) {
-    console.error('ERROR: In Lambda environment, executablePath is not valid:', executablePath);
+  // Explicitly check if executablePath is valid for Vercel
+  if (isVercelEnvironment && (!executablePath || typeof executablePath !== 'string' || executablePath.trim() === '')) {
+    console.error('ERROR: In Vercel environment, executablePath is not valid:', executablePath);
     return res.status(500).json({
-      error: 'Puppeteer launch failed: Missing or invalid Chromium executable path for Lambda environment.',
-      details: 'Ensure @sparticuz/chromium-min is correctly deployed and can locate the Chromium binary.'
+      error: 'Puppeteer launch failed: Missing or invalid Chromium executable path for Vercel environment.',
+      details: 'Ensure @sparticuz/chromium is correctly integrated and can locate the Chromium binary.'
     });
   }
 
-  const launchOptions = isLambda
+  const launchOptions = isVercelEnvironment
     ? {
-        args: chromiumArgs, // Use the correct variable name
-        defaultViewport: chromiumDefaultViewport, // Use the correct variable name
-        executablePath: executablePath, // Use the correctly obtained path
+        args: chromiumArgs,
+        defaultViewport: chromiumDefaultViewport,
+        executablePath: executablePath,
         headless: true, // Chromium for serverless is always headless
       }
     : {
@@ -64,11 +66,9 @@ export default async function (req, res) {
         headless: true,
         slowMo: 50,
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
-        // executablePath is not strictly needed here if a system browser is found,
-        // but can be added for explicit local path if desired.
       };
 
-  let browser; // Declare browser outside try-block for finally access
+  let browser;
 
   try {
     console.log('Attempting to launch Puppeteer with options:', JSON.stringify(launchOptions, null, 2));
@@ -80,7 +80,6 @@ export default async function (req, res) {
     await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
     await page.waitForSelector('div.PagePromo-content', { timeout: 15000 });
 
-    // Extract up to 10 articles from the listing
     const articles = await page.evaluate(() => {
       const articleDivs = Array.from(document.querySelectorAll('div.PagePromo-content'));
       const raw = articleDivs.map(div => {
@@ -93,7 +92,6 @@ export default async function (req, res) {
         return { title, url };
       }).filter(article => article.title && article.url);
 
-      // Deduplicate by URL
       const seen = new Set();
       return raw.filter(article => {
         if (seen.has(article.url)) return false;
@@ -128,7 +126,6 @@ export default async function (req, res) {
       }
     }
 
-    // Optional: deduplicate again by title (to be extra safe)
     const seenTitles = new Set();
     const deduplicated = detailedArticles.filter(article => {
       if (seenTitles.has(article.title)) return false;
@@ -142,7 +139,7 @@ export default async function (req, res) {
     console.error('Error during scraping or Puppeteer launch:', err);
     res.status(500).json({ error: 'Scraping failed', details: err.message });
   } finally {
-    if (browser) { // Ensure browser exists before trying to close it
+    if (browser) {
       await browser.close();
     }
   }
