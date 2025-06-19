@@ -5,7 +5,7 @@ async function getBrowserModules() {
     ? await import('puppeteer-core')
     : await import('puppeteer');
   
-  const chromium = await import('@sparticuz/chromium');
+  const chromium = await import('@sparticuz/chromium-min');
   return { puppeteer, chromium };
 }
 
