@@ -7,7 +7,9 @@ async function getBrowserModules() {
   
   const chromium = await import('@sparticuz/chromium-min');
 
-  const executablePath =  isLambda ? chromium.executablePath : null
+  const executablePath = isLambda 
+    ? chromium.executablePath 
+    : (await import('puppeteer')).executablePath();
 
   return { puppeteer, chromium, executablePath};
 }
@@ -17,10 +19,10 @@ module.exports = async (req, res) => {
   
   const launchOptions = isLambda
     ? {
-        args: chromium.args,
-        defaultViewport: chromium.defaultViewport,
+        args: chromium.args || [],
+        defaultViewport: chromium.defaultViewport || null,
         executablePath,
-        headless: chromium.headless,
+        headless: true,
       }
     : {
         headless: true,
@@ -103,3 +105,4 @@ module.exports = async (req, res) => {
     await browser.close();
   }
 };
+
