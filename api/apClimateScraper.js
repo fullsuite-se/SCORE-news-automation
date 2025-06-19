@@ -4,19 +4,25 @@ async function getBrowserModules() {
   const puppeteer = await import('puppeteer-core')  
   const { default: chromium } = await import('@sparticuz/chromium-min');
 
-  console.log('--- Debugging chromium object ---');
-  console.log('Type of chromium (after destructure):', typeof chromium);
-  console.log('Keys of chromium (after destructure):', Object.keys(chromium));
-  console.log('Full chromium object (after destructure):', chromium); 
-  console.log('--- End chromium Debug ---');
+ console.log('--- Debugging ChromiumClass object ---');
+ console.log('Type of ChromiumClass:', typeof ChromiumClass);
+ console.log('Keys of ChromiumClass:', Object.keys(ChromiumClass));
+ console.log('Full ChromiumClass object:', ChromiumClass); 
+ console.log('ChromiumClass.executablePath is a function:', typeof ChromiumClass.executablePath === 'function');
+ console.log('ChromiumClass.args:', ChromiumClass.args);
+ console.log('ChromiumClass.defaultViewport:', ChromiumClass.defaultViewport);
+ console.log('--- End ChromiumClass Debug ---');
 
-  const executablePath = await chromium.executablePath;
 
-  return { puppeteer, chromium, executablePath};
+  return { puppeteer, 
+    chromiumArgs: ChromiumClass.args, // Renamed to avoid confusion
+    chromiumDefaultViewport: ChromiumClass.defaultViewport, // Renamed
+    executablePath: executablePathString};
 }
 
 export default async function (req, res) {
-  const { puppeteer, chromium, executablePath } = await getBrowserModules();
+  const { puppeteer, chromiumArgs, chromiumDefaultViewport, executablePath } = await getBrowserModules();
+
   
   // --- ADD THIS LOGGING ---
   console.log('--- Puppeteer Launch Debug Info ---');
@@ -31,7 +37,7 @@ export default async function (req, res) {
     ? {
         args: chromium.args,
         defaultViewport: chromium.defaultViewport,
-        executablePath,
+        executablePath: executablePath,
         headless: true,
       }
     : {
