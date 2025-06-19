@@ -1,8 +1,7 @@
 const isLambda = !!process.env.AWS_REGION;
 
 async function getBrowserModules() {
-  const puppeteer = await import('puppeteer-core')
-  
+  const puppeteer = await import('puppeteer-core')  
   const chromium = await import('@sparticuz/chromium-min');
 
   const executablePath = await chromium.executablePath;
@@ -23,7 +22,7 @@ module.exports = async (req, res) => {
     : {
         headless: true,
         slowMo: 50,
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
       };
 
   const browser = await puppeteer.launch(launchOptions);
