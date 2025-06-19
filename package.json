@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@sparticuz/chromium": "^137.0.1",
     "@sparticuz/chromium-min": "^137.0.1",
     "puppeteer": "^24.10.1",
     "puppeteer-core": "^24.10.2"
@@ -9,8 +10,5 @@
   },
   "puppeteer": {
     "skip_chromium_download": false
-  },
-  "devDependencies": {
-    "@sparticuz/chromium": "^137.0.1"
   }
 }

@@ -1,9 +1,7 @@
 const isLambda = !!process.env.AWS_REGION;
 
 async function getBrowserModules() {
-  const puppeteer = isLambda 
-    ? await import('puppeteer-core')
-    : await import('puppeteer');
+  const puppeteer = await import('puppeteer-core')
   
   const chromium = await import('@sparticuz/chromium-min');
 
