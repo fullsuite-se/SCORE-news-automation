@@ -54,58 +54,57 @@ export default async function (req, res) {
       }
     : {
         headless: true,
+        defaultViewport: null,
         slowMo: 50,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
       };
 
   let browser;
-  const url = 'https://www.weforum.org/stories/sustainable-development/';
+  const url = 'https://www.greenpeace.org/international/posts/';
 
   try {
     console.log('Attempting to launch Puppeteer with options:', JSON.stringify(launchOptions, null, 2));
     browser = await puppeteer.launch(launchOptions);
     const page = await browser.newPage();
 
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-    await new Promise(resolve => setTimeout(resolve, 3000)); // Wait for dynamic content to load
+    await page.waitForSelector('.query-list-item-body', { timeout: 10000 });
 
     const articles = await page.evaluate(() => {
-      const links = Array.from(document.querySelectorAll('a.chakra-heading.wef-16v1g8r'));
+      const nodes = document.querySelectorAll('.query-list-item-body');
       const seen = new Set();
       const results = [];
 
-      links.forEach(link => {
-        let dateText = null;
-        const dateElement = link.closest('div')?.querySelector('time, span, div');
-        if (dateElement) dateText = dateElement.textContent.trim();
+      nodes.forEach(node => {
+        const anchor = node.querySelector('h4.query-list-item-headline.wp-block-post-title a');
+        const dateEl = node.querySelector('.wp-block-post-date time');
 
-        const title = link.textContent.trim();
-        const url = link.href;
-        const date = dateText || 'Date not found';
+        const title = anchor?.textContent.trim();
+        const url = anchor?.href.trim();
+        const date = dateEl?.getAttribute('datetime') || 'No date found';
 
-        const uniqueKey = `${title}||${url}`;
-        if (!seen.has(uniqueKey)) {
-          seen.add(uniqueKey);
+        if (title && url && !seen.has(url)) {
+          seen.add(url);
           results.push({ title, url, date });
         }
       });
+
       console.log(`Found ${results.length} articles on listing page.`);
-      return results; // Return all scraped articles before slicing
+      return results.slice(0, 10);
     });
 
     if (articles.length === 0) {
-      console.log('No articles found!');
+      console.warn('No articles found.');
       return res.status(200).json({ message: 'No articles found' });
     }
 
-    const limitedArticles = articles.slice(0, 10);
-    console.log(`Returning ${limitedArticles.length} articles.`);
-    res.status(200).json(limitedArticles);
+    console.log(`Returning ${articles.length} articles.`);
+    res.status(200).json(articles);
 
-  } catch (error) {
-    console.error('Error during scraping:', error.message);
-    res.status(500).json({ error: 'Scraping failed', details: error.message });
+  } catch (err) {
+    console.error('Scraping failed:', err.message);
+    res.status(500).json({ error: 'Scraping failed', details: err.message });
   } finally {
     if (browser) {
       await browser.close();

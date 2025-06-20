@@ -54,58 +54,61 @@ export default async function (req, res) {
       }
     : {
         headless: true,
+        defaultViewport: null,
         slowMo: 50,
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
       };
 
   let browser;
-  const url = 'https://www.weforum.org/stories/sustainable-development/';
+  const url = 'https://unfccc.int/news?field_page_type_of_news_target_id%5B%5D=1842&field_page_type_of_news_target_id%5B%5D=1843&field_page_type_of_news_target_id%5B%5D=4&field_page_type_of_news_target_id%5B%5D=2&field_page_type_of_news_target_id%5B%5D=7&field_page_type_of_news_target_id%5B%5D=3&field_page_type_of_news_target_id%5B%5D=504&created=&search=&sort_by=created&sort_order=DESC';
 
   try {
     console.log('Attempting to launch Puppeteer with options:', JSON.stringify(launchOptions, null, 2));
     browser = await puppeteer.launch(launchOptions);
     const page = await browser.newPage();
 
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-    await new Promise(resolve => setTimeout(resolve, 3000)); // Wait for dynamic content to load
+    await page.waitForSelector('div.news', { timeout: 10000 });
 
     const articles = await page.evaluate(() => {
-      const links = Array.from(document.querySelectorAll('a.chakra-heading.wef-16v1g8r'));
+      const articleNodes = document.querySelectorAll('div.news article');
       const seen = new Set();
       const results = [];
 
-      links.forEach(link => {
-        let dateText = null;
-        const dateElement = link.closest('div')?.querySelector('time, span, div');
-        if (dateElement) dateText = dateElement.textContent.trim();
+      articleNodes.forEach(article => {
+        const anchor = article.querySelector('a.news-teaser');
+        const infoContainer = anchor?.querySelector('.info-container');
+        const dateEl = infoContainer?.querySelector('.date');
+        const titleEl = infoContainer?.querySelector('span');
 
-        const title = link.textContent.trim();
-        const url = link.href;
-        const date = dateText || 'Date not found';
+        if (anchor && titleEl && dateEl) {
+          const url = new URL(anchor.getAttribute('href'), window.location.origin).href;
+          const title = titleEl.textContent.trim();
+          const date = dateEl.textContent.trim();
 
-        const uniqueKey = `${title}||${url}`;
-        if (!seen.has(uniqueKey)) {
-          seen.add(uniqueKey);
-          results.push({ title, url, date });
+          if (!seen.has(url)) {
+            seen.add(url);
+            results.push({ title, url, date });
+          }
         }
       });
+
       console.log(`Found ${results.length} articles on listing page.`);
-      return results; // Return all scraped articles before slicing
+      return results.slice(0, 10);
     });
 
     if (articles.length === 0) {
-      console.log('No articles found!');
+      console.warn('No articles found.');
       return res.status(200).json({ message: 'No articles found' });
     }
 
-    const limitedArticles = articles.slice(0, 10);
-    console.log(`Returning ${limitedArticles.length} articles.`);
-    res.status(200).json(limitedArticles);
+    console.log(`Returning ${articles.length} articles.`);
+    res.status(200).json(articles);
 
-  } catch (error) {
-    console.error('Error during scraping:', error.message);
-    res.status(500).json({ error: 'Scraping failed', details: error.message });
+  } catch (err) {
+    console.error('Scraping failed:', err.message);
+    res.status(500).json({ error: 'Scraping failed', details: err.message });
   } finally {
     if (browser) {
       await browser.close();

@@ -54,58 +54,60 @@ export default async function (req, res) {
       }
     : {
         headless: true,
+        defaultViewport: null,
         slowMo: 50,
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
       };
 
   let browser;
-  const url = 'https://www.weforum.org/stories/sustainable-development/';
+  const url = 'https://www.climatebonds.net/news-events/press-room/press-releases';
 
   try {
     console.log('Attempting to launch Puppeteer with options:', JSON.stringify(launchOptions, null, 2));
     browser = await puppeteer.launch(launchOptions);
     const page = await browser.newPage();
 
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-    await new Promise(resolve => setTimeout(resolve, 3000)); // Wait for dynamic content to load
+    await page.waitForSelector('.text-xl.mb-4.line-clamp-3', { timeout: 10000 });
 
     const articles = await page.evaluate(() => {
-      const links = Array.from(document.querySelectorAll('a.chakra-heading.wef-16v1g8r'));
+      const articleNodes = document.querySelectorAll('.text-xl.mb-4.line-clamp-3');
       const seen = new Set();
       const results = [];
 
-      links.forEach(link => {
-        let dateText = null;
-        const dateElement = link.closest('div')?.querySelector('time, span, div');
-        if (dateElement) dateText = dateElement.textContent.trim();
+      articleNodes.forEach(node => {
+        const wrapper = node.closest('.z-20');
+        const linkEl = wrapper?.querySelector('a.stretched-link');
+        const dateEl = wrapper?.querySelector('.flex.flex-row.justify-between.items-center p.mb-0');
 
-        const title = link.textContent.trim();
-        const url = link.href;
-        const date = dateText || 'Date not found';
+        if (linkEl && node && dateEl) {
+          const title = node.textContent.trim();
+          const url = linkEl.href;
+          const date = dateEl.textContent.trim();
 
-        const uniqueKey = `${title}||${url}`;
-        if (!seen.has(uniqueKey)) {
-          seen.add(uniqueKey);
-          results.push({ title, url, date });
+          if (!seen.has(url)) {
+            seen.add(url);
+            results.push({ title, date, url });
+          }
         }
       });
+
       console.log(`Found ${results.length} articles on listing page.`);
-      return results; // Return all scraped articles before slicing
+      return results.slice(0, 10);
     });
 
     if (articles.length === 0) {
-      console.log('No articles found!');
+      console.warn('No articles found.');
       return res.status(200).json({ message: 'No articles found' });
     }
 
-    const limitedArticles = articles.slice(0, 10);
-    console.log(`Returning ${limitedArticles.length} articles.`);
-    res.status(200).json(limitedArticles);
+    console.log(`Returning ${articles.length} articles.`);
+    res.status(200).json(articles);
 
-  } catch (error) {
-    console.error('Error during scraping:', error.message);
-    res.status(500).json({ error: 'Scraping failed', details: error.message });
+  } catch (err) {
+    console.error('Scraping failed:', err.message);
+    res.status(500).json({ error: 'Scraping failed', details: err.message });
   } finally {
     if (browser) {
       await browser.close();
