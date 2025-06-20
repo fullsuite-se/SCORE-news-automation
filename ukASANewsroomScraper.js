@@ -1,15 +1,22 @@
-const puppeteer = require('puppeteer');
-const fs = require('fs');
-const path = require('path');
+import puppeteer from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
+import fs from 'fs';
+import path from 'path';
 
-async function ukASANewsroomScraper() {
-  const browser = await puppeteer.launch({ headless: false, slowMo: 50 });
-  const page = await browser.newPage();
-  const url = 'https://www.asa.org.uk/advice-and-resources/news.html';
-
+export default async function handler(req, res) {
   try {
+    const browser = await puppeteer.launch({
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
+    });
+
+    const page = await browser.newPage();
+    const url = 'https://www.asa.org.uk/advice-and-resources/news.html';
+
     console.log('Navigating to ASA News...');
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
     // Wait for articles to appear
     await page.waitForSelector('li.listing-item.news-item', { timeout: 15000 });
@@ -30,22 +37,14 @@ async function ukASANewsroomScraper() {
     });
 
     if (articles.length === 0) {
-      console.log('No articles found!');
+      res.status(404).json({ message: 'No articles found' });
       return;
     }
 
-    // Save to JSON
-    const filename = 'uk_asa_newsroom.json';
-    const fullPath = path.join(process.cwd(), filename);
-    fs.writeFileSync(fullPath, JSON.stringify(articles, null, 2), 'utf8');
-    console.log(`JSON saved to: ${fullPath}`);
-    console.log('Articles saved:', articles.length);
+    res.setHeader('Content-Type', 'application/json');
+    res.status(200).json(articles);
   } catch (err) {
     console.error('Scraping failed:', err.message);
-  } finally {
-    console.log('Closing browser...');
-    await browser.close();
+    res.status(500).json({ message: 'Scraping failed' });
   }
 }
-
-ukASANewsroomScraper();
