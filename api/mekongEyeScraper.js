@@ -1,74 +1,23 @@
-const isVercelEnvironment = !!process.env.AWS_REGION;
+import puppeteer from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
 
-async function getBrowserModules() {
-  const puppeteer = await import('puppeteer-core');
-  const { default: ChromiumClass } = await import('@sparticuz/chromium');
-
-  console.log('--- Debugging ChromiumClass object (Vercel) ---');
-  console.log('Type of ChromiumClass:', typeof ChromiumClass);
-  console.log('Keys of ChromiumClass:', Object.keys(ChromiumClass));
-  console.log('Full ChromiumClass object:', ChromiumClass);
-  console.log('ChromiumClass.executablePath is a function:', typeof ChromiumClass.executablePath === 'function');
-  console.log('ChromiumClass.args:', ChromiumClass.args);
-  console.log('ChromiumClass.defaultViewport:', ChromiumClass.defaultViewport);
-  console.log('--- End ChromiumClass Debug (Vercel) ---');
-
-  let executablePathValue = null;
-  if (typeof ChromiumClass.executablePath === 'function') {
-    executablePathValue = await ChromiumClass.executablePath();
-  } else {
-    executablePathValue = ChromiumClass.executablePath;
-  }
-
-  return {
-    puppeteer,
-    chromiumArgs: ChromiumClass.args,
-    chromiumDefaultViewport: ChromiumClass.defaultViewport,
-    executablePath: executablePathValue
-  };
-}
-
-export default async function (req, res) {
-  const { puppeteer, chromiumArgs, chromiumDefaultViewport, executablePath } = await getBrowserModules();
-
-  console.log('--- Puppeteer Launch Debug Info (Vercel) ---');
-  console.log('isVercelEnvironment:', isVercelEnvironment);
-  console.log('chromiumArgs (from @sparticuz/chromium):', chromiumArgs);
-  console.log('chromiumDefaultViewport (from @sparticuz/chromium):', chromiumDefaultViewport);
-  console.log('Executable Path (from @sparticuz/chromium):', executablePath);
-  console.log('--- End Debug Info (Vercel) ---');
-
-  if (isVercelEnvironment && (!executablePath || typeof executablePath !== 'string' || executablePath.trim() === '')) {
-    console.error('ERROR: In Vercel environment, executablePath is not valid:', executablePath);
-    return res.status(500).json({
-      error: 'Puppeteer launch failed: Missing or invalid Chromium executable path for Vercel environment.'
-    });
-  }
-
-  const launchOptions = isVercelEnvironment
-    ? {
-        args: chromiumArgs,
-        defaultViewport: chromiumDefaultViewport,
-        executablePath: executablePath,
-        headless: true,
-      }
-    : {
-        headless: true,
-        defaultViewport: null,
-        slowMo: 50,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
-      };
-
-  let browser;
-  const url = 'https://www.mekongeye.com/category/regions';
-
+export default async function handler(req, res) {
   try {
-    console.log('Attempting to launch Puppeteer with options:', JSON.stringify(launchOptions, null, 2));
-    browser = await puppeteer.launch(launchOptions);
-    const page = await browser.newPage();
+    const browser = await puppeteer.launch({
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
+    });
 
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 0 });
-    await page.waitForSelector('div.entry-container', { timeout: 20000 });
+    const page = await browser.newPage();
+    const url = 'https://www.mekongeye.com/category/regions';
+
+    console.log('Navigating to Mekong Eye...');
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+
+    // Wait for articles to appear
+    await page.waitForSelector('div.entry-container', { timeout: 30000 });
 
     const articles = await page.evaluate(() => {
       const nodes = document.querySelectorAll('div.entry-container');
@@ -97,15 +46,14 @@ export default async function (req, res) {
     });
 
     if (articles.length === 0) {
-      console.log('No articles found.');
-      return res.status(200).json({ message: 'No articles found' });
+      console.log('No articles found!');
+      res.status(200).json({ message: 'No articles found' });
+      return;
     }
 
-    console.log(`Returning ${articles.length} articles.`);
     res.status(200).json(articles);
-
   } catch (err) {
-    console.error('Error during scraping:', err.message);
+    console.error('Scraping failed:', err.message);
     res.status(500).json({ error: 'Scraping failed', details: err.message });
   } finally {
     if (browser) {
