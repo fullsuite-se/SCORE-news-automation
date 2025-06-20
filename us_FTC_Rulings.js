@@ -1,14 +1,18 @@
-const puppeteer = require('puppeteer');
-const fs = require('fs');
-const path = require('path');
+import puppeteer from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
 
-async function usFTCRulingsScraper() {
-  const browser = await puppeteer.launch({ headless: false, slowMo: 50 });
-  const page = await browser.newPage();
-
-  const url = 'https://www.ftc.gov/legal-library/browse/cases-proceedings?sort_by=field_date&items_per_page=20&field_mission%5B29%5D=29&search=&field_competition_topics=All&field_consumer_protection_topics=1408&field_federal_court=All&field_industry=All&field_case_status=All&field_enforcement_type=All&search_matter_number=&search_civil_action_number=&start_date=&end_date=';
-
+export default async function handler(req, res) {
   try {
+    const browser = await puppeteer.launch({
+      args: chromium.args,
+      defaultViewport: chromium.defaultViewport,
+      executablePath: await chromium.executablePath(),
+      headless: chromium.headless,
+    });
+
+    const page = await browser.newPage();
+    const url = 'https://www.ftc.gov/legal-library/browse/cases-proceedings?sort_by=field_date&items_per_page=20&field_mission%5B29%5D=29&search=&field_competition_topics=All&field_consumer_protection_topics=1408&field_federal_court=All&field_industry=All&field_case_status=All&field_enforcement_type=All&search_matter_number=&search_civil_action_number=&start_date=&end_date=';
+
     console.log('Navigating to FTC page...');
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
@@ -31,20 +35,17 @@ async function usFTCRulingsScraper() {
 
     if (articles.length === 0) {
       console.log('No articles found.');
+      res.status(200).json({ message: 'No articles found' });
       return;
     }
 
-    const filename = 'us_FTC_rulings.json';
-    const fullPath = path.join(process.cwd(), filename);
-    fs.writeFileSync(fullPath, JSON.stringify(articles, null, 2), 'utf8');
-    console.log(`JSON file saved at: ${fullPath}`);
-    console.log('Number of articles saved:', articles.length);
+    res.status(200).json(articles);
   } catch (err) {
     console.error('Scraping failed:', err.message);
+    res.status(500).json({ error: 'Scraping failed', 'details': err.message });
   } finally {
-    console.log('Closing browser...');
-    await browser.close();
+    if (browser) {
+      await browser.close();
+    }
   }
 }
-
-usFTCRulingsScraper();
