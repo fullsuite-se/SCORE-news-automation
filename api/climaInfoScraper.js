@@ -1,7 +1,11 @@
 const isVercelEnvironment = !!process.env.AWS_REGION;
 
 async function getBrowserModules() {
-  const puppeteer = await import('puppeteer-core');
+  // const puppeteer = await import('puppeteer-core');
+  const puppeteer = (await import('puppeteer-extra')).default;
+  const StealthPlugin = (await import('puppeteer-extra-plugin-stealth')).default;
+  puppeteer.use(StealthPlugin());
+
   const { default: ChromiumClass } = await import('@sparticuz/chromium');
 
   console.log('--- Debugging ChromiumClass object (Vercel) ---');
@@ -50,10 +54,10 @@ export default async function (req, res) {
         args: chromiumArgs,
         defaultViewport: chromiumDefaultViewport,
         executablePath: executablePath,
-        headless: true, // Must be true for serverless environments
+        headless: "new", // Must be true for serverless environments
       }
     : {
-        headless: true, // Set to true for consistency, or false for local visual debugging
+        headless: "new", // Set to true for consistency, or false for local visual debugging
         defaultViewport: null,
         slowMo: 50,
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
@@ -66,6 +70,7 @@ export default async function (req, res) {
   try {
     console.log('Attempting to launch Puppeteer with options:', JSON.stringify(launchOptions, null, 2));
     browser = await puppeteer.launch(launchOptions);
+
     const page = await browser.newPage();
 
     await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
