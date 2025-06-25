@@ -50,63 +50,65 @@ export default async function (req, res) {
         args: chromiumArgs,
         defaultViewport: chromiumDefaultViewport,
         executablePath: executablePath,
-        headless: true, // Must be true for serverless environments
+        headless: true,
       }
     : {
-        headless: true, // Set to true for consistency, or false for local visual debugging
+        headless: true,
+        defaultViewport: null,
         slowMo: 50,
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
       };
 
   let browser;
-  const url = 'https://www.mpf.mp.br/sala-de-imprensa/noticias';
+  const url = 'https://english.www.gov.cn/policies/latestreleases';
 
   try {
     console.log('Attempting to launch Puppeteer with options:', JSON.stringify(launchOptions, null, 2));
     browser = await puppeteer.launch(launchOptions);
     const page = await browser.newPage();
 
-    console.log('Navigating to MPF News page...');
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-    await page.waitForSelector('article', { timeout: 10000 });
-    console.log('Post containers found.');
+    await page.waitForSelector('li', { timeout: 10000 });
 
     const articles = await page.evaluate(() => {
-      const seenUrls = new Set();
+      const nodes = document.querySelectorAll('li');
+      const seen = new Set();
       const results = [];
 
-      Array.from(document.querySelectorAll('article')).forEach(article => {
-        const h2 = article.querySelector('h2 a[href]');
-        const title = h2 ? h2.textContent.trim() : null;
-        const url = h2 ? h2.href : null;
+      nodes.forEach(node => {
+        const linkEl = node.querySelector('h3.Font_Georgia a');
+        const dateEl = node.querySelector('h4');
 
-        const dateSpan = article.querySelector('div.categoria span.data');
-        const date = dateSpan ? dateSpan.textContent.trim() : 'Date not found';
+        if (linkEl && dateEl) {
+          const relativeUrl = linkEl.getAttribute('href');
+          const url = new URL(relativeUrl, window.location.origin).href;
+          const title = linkEl.textContent.trim();
+          const date = dateEl.textContent.trim();
 
-        if (title && url && !seenUrls.has(url)) {
-          seenUrls.add(url);
-          results.push({ title, url, date });
+          if (!seen.has(url)) {
+            seen.add(url);
+            results.push({ title, date, url });
+          }
         }
       });
+
       console.log(`Found ${results.length} articles on listing page.`);
-      return results;
+      return results.slice(0, 10);
     });
 
     if (articles.length === 0) {
-      console.log('No articles found!');
+      console.warn('No articles found.');
       return res.status(200).json({ message: 'No articles found' });
     }
 
-    const limitedArticles = articles.slice(0, 10);
-    console.log(`Returning ${limitedArticles.length} articles.`);
-    res.status(200).json(limitedArticles);
+    console.log(`Returning ${articles.length} articles.`);
+    res.status(200).json(articles);
 
   } catch (err) {
-    console.error('Error during scraping:', err.message);
+    console.error('Scraping failed:', err.message);
     res.status(500).json({ error: 'Scraping failed', details: err.message });
   } finally {
-    console.log('Closing browser...');
     if (browser) {
       await browser.close();
     }
