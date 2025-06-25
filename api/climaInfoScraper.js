@@ -1,8 +1,8 @@
 const isVercelEnvironment = !!process.env.AWS_REGION;
 
 async function getBrowserModules() {
-  // const puppeteer = await import('puppeteer-core');
-  const puppeteer = (await import('puppeteer-extra')).default;
+  const puppeteer = await import('puppeteer-core');
+  // const puppeteer = (await import('puppeteer-extra')).default;
   const StealthPlugin = (await import('puppeteer-extra-plugin-stealth')).default;
   puppeteer.use(StealthPlugin());
 
