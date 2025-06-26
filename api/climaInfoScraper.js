@@ -1,8 +1,9 @@
 const isVercelEnvironment = !!process.env.AWS_REGION;
 
 async function getBrowserModules() {
-  // const puppeteer = await import('puppeteer-core');
   const puppeteer = (await import('puppeteer-extra')).default;
+
+  // stealth plugin to hide puppeteer
   const StealthPlugin = (await import('puppeteer-extra-plugin-stealth')).default;
   puppeteer.use(StealthPlugin());
 
@@ -23,6 +24,8 @@ async function getBrowserModules() {
   } else {
     executablePathValue = ChromiumClass.executablePath;
   }
+
+  console.log('EXECUTABLE PATH VALUE: ', executablePathValue);
 
   return {
     puppeteer,
@@ -61,6 +64,7 @@ export default async function (req, res) {
         defaultViewport: null,
         slowMo: 50,
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
+        executablePath: executablePath,
       };
 
   let browser;
