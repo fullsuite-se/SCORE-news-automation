@@ -22,8 +22,12 @@ async function getBrowserModules() {
   // stealth plugin to hide puppeteer
   const StealthPlugin = (await import('puppeteer-extra-plugin-stealth')).default;
   puppeteer.use(StealthPlugin());
+
   const UserPreferencesPlugin = (await import('puppeteer-extra-plugin-user-preferences')).default;
   puppeteer.use(UserPreferencesPlugin());
+  const UserDataDirPlugin = (await import('puppeteer-extra-plugin-user-data-dir')).default;
+  puppeteer.use(UserDataDirPlugin());
+  
   const { default: ChromiumClass } = await import('@sparticuz/chromium');
   console.log('--- Debugging ChromiumClass object (Vercel) ---');
   console.log('Type of ChromiumClass:', typeof ChromiumClass);
