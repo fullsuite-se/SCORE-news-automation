@@ -1,22 +1,22 @@
 const isVercelEnvironment = !!process.env.AWS_REGION;
 async function getBrowserModules() {
-  await import('puppeteer-extra-plugin-stealth/evasions/chrome.app');
-  await import('puppeteer-extra-plugin-stealth/evasions/chrome.csi');
-  await import('puppeteer-extra-plugin-stealth/evasions/chrome.loadTimes');
-  await import('puppeteer-extra-plugin-stealth/evasions/chrome.runtime');
-  await import('puppeteer-extra-plugin-stealth/evasions/defaultArgs');
-  await import('puppeteer-extra-plugin-stealth/evasions/iframe.contentWindow');
-  await import('puppeteer-extra-plugin-stealth/evasions/media.codecs');
-  await import('puppeteer-extra-plugin-stealth/evasions/navigator.hardwareConcurrency');
-  await import('puppeteer-extra-plugin-stealth/evasions/navigator.languages');
-  await import('puppeteer-extra-plugin-stealth/evasions/navigator.permissions');
-  await import('puppeteer-extra-plugin-stealth/evasions/navigator.plugins');
-  await import('puppeteer-extra-plugin-stealth/evasions/navigator.vendor');
-  await import('puppeteer-extra-plugin-stealth/evasions/navigator.webdriver');
-  await import('puppeteer-extra-plugin-stealth/evasions/sourceurl');
-  await import('puppeteer-extra-plugin-stealth/evasions/user-agent-override');
-  await import('puppeteer-extra-plugin-stealth/evasions/webgl.vendor');
-  await import('puppeteer-extra-plugin-stealth/evasions/window.outerdimensions');
+  await import('puppeteer-extra-plugin-stealth/evasions/chrome.app/index.js');
+  await import('puppeteer-extra-plugin-stealth/evasions/chrome.csi/index.js');
+  await import('puppeteer-extra-plugin-stealth/evasions/chrome.loadTimes/index.js');
+  await import('puppeteer-extra-plugin-stealth/evasions/chrome.runtime/index.js');
+  await import('puppeteer-extra-plugin-stealth/evasions/defaultArgs/index.js');
+  await import('puppeteer-extra-plugin-stealth/evasions/iframe.contentWindow/index.js');
+  await import('puppeteer-extra-plugin-stealth/evasions/media.codecs/index.js');
+  await import('puppeteer-extra-plugin-stealth/evasions/navigator.hardwareConcurrency/index.js');
+  await import('puppeteer-extra-plugin-stealth/evasions/navigator.languages/index.js');
+  await import('puppeteer-extra-plugin-stealth/evasions/navigator.permissions/index.js');
+  await import('puppeteer-extra-plugin-stealth/evasions/navigator.plugins/index.js');
+  await import('puppeteer-extra-plugin-stealth/evasions/navigator.vendor/index.js');
+  await import('puppeteer-extra-plugin-stealth/evasions/navigator.webdriver/index.js');
+  await import('puppeteer-extra-plugin-stealth/evasions/sourceurl/index.js');
+  await import('puppeteer-extra-plugin-stealth/evasions/user-agent-override/index.js');
+  await import('puppeteer-extra-plugin-stealth/evasions/webgl.vendor/index.js');
+  await import('puppeteer-extra-plugin-stealth/evasions/window.outerdimensions/index.js');
 
   
   const puppeteer = (await import('puppeteer-extra')).default;
