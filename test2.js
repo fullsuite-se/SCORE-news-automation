@@ -2,64 +2,73 @@ const puppeteer = require('puppeteer');
 const fs = require('fs');
 const path = require('path');
 
-async function globalComplianceNewsScraper() {
+async function politicoUkScraper() {
   const browser = await puppeteer.launch({
     headless: true,
-    defaultViewport: null,
+    defaultViewport: null, // Added for consistency
     slowMo: 50,
   });
 
   const page = await browser.newPage();
-  const url = 'https://www.globalcompliancenews.com/category/esg/';
+  const baseUrl = 'https://www.politico.eu/section/energy-uk/'; // Renamed to baseUrl for consistency
 
   try {
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 0 });
+    console.log(`Navigating to: ${baseUrl}`);
+    await page.goto(baseUrl, { waitUntil: 'networkidle2', timeout: 60000 });
 
-    await page.waitForSelector('div.post-meta.post-meta-b', { timeout: 10000 });
+    console.log('Waiting for post containers...');
+    await page.waitForSelector('div.card__content', { timeout: 60000 });
+    console.log('Post containers found.');
 
     const articles = await page.evaluate(() => {
-      const articleNodes = document.querySelectorAll('div.post-meta.post-meta-b');
-      const seen = new Set();
       const results = [];
+      const newsItems = document.querySelectorAll('div.card__content'); // Renamed for consistency
 
-      articleNodes.forEach(article => {
-        const titleTag = article.querySelector('h2.post-title-alt a');
-        const dateTag = article.querySelector('div.below time.post-date');
+      newsItems.forEach(container => {
+        let title = null;
+        let url = null;
+        let date = null;
 
-        const title = titleTag?.textContent?.trim() || null;
-        let url = titleTag?.getAttribute('href')?.trim() || null;
-        const date = dateTag?.getAttribute('datetime') || dateTag?.textContent?.trim() || null;
+        const aTag = container.querySelector('h2.card__title a');
+        const dateEl = container.querySelector('div.date-time.card__date-time.after-title span.date-time__date');
 
-        if (url && !url.startsWith('http')) {
-          url = 'https://www.globalcompliancenews.com' + url;
+        if (aTag) {
+          title = aTag.textContent.trim();
+          // Ensure URL is absolute using window.location.origin for robustness
+          url = new URL(aTag.getAttribute('href'), window.location.origin).href;
         }
 
-        const uniqueKey = `${title}||${url}`;
-        if (title && url && date && !seen.has(uniqueKey)) {
-          seen.add(uniqueKey);
+        if (dateEl) {
+          date = dateEl.textContent.trim();
+        }
+
+        // Only push if all essential data points are found
+        if (title && url && date) {
           results.push({ title, url, date });
         }
       });
 
-      // Return only 10 articles after deduplication
-      return results.slice(0, 10);
+      return results.slice(0, 10); // Apply the 10-article limit
     });
 
     if (articles.length === 0) {
-      console.log(' No articles found.');
-      return;
+      console.log('No articles found on the page after scraping.');
+      return; // Exit if no articles
     }
 
-    const filename = 'globalComplianceNews.json';
-    const fullPath = path.join(process.cwd(), filename);
-    fs.writeFileSync(fullPath, JSON.stringify(articles, null, 2), 'utf8');
+    const filePath = path.join(process.cwd(), 'politicoUk.json'); // Renamed filename for consistency
+    fs.writeFileSync(filePath, JSON.stringify(articles, null, 2), 'utf8');
 
-    console.log(`\n JSON saved at: ${fullPath}`);
+    console.log(`\nJSON saved to ${filePath}`);
+    console.log(`Scraped ${articles.length} articles (limited to 10).`);
+
   } catch (err) {
-    console.error(' Error during scraping:', err);
+    console.error('Scraping failed:', err.message);
+    console.error(err); // Log full error object for detailed debugging
   } finally {
+    console.log('Closing browser.');
     await browser.close();
   }
 }
 
-globalComplianceNewsScraper();
+politicoUkScraper();
