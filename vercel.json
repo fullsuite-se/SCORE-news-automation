@@ -1,7 +1,7 @@
 {
   "functions": {
     "api/straitsTimesScraper.js": {
-      "maxDuration": 3600
+      "maxDuration": 900
     }
   }
 }
