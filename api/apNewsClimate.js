@@ -1,34 +1,55 @@
-
-import fs from 'fs';
-import path from 'path';
 import puppeteerExtra from 'puppeteer-extra';
 import stealthPlugin from 'puppeteer-extra-plugin-stealth';
 
 puppeteerExtra.use(stealthPlugin());
 
+const isVercelEnvironment = !!process.env.AWS_REGION;
+
 async function getBrowserModules() {
-  const puppeteer = puppeteerExtra;
-  return {
-    puppeteer,
-    launchOptions: {
-      headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
-    }
-  };
+  if (isVercelEnvironment) {
+    const { default: ChromiumClass } = await import('@sparticuz/chromium');
+    
+    const executablePathValue = await ChromiumClass.executablePath();
+    
+    return {
+      puppeteer: puppeteerExtra,
+      launchOptions: {
+        args: ChromiumClass.args,
+        defaultViewport: ChromiumClass.defaultViewport,
+        executablePath: executablePathValue,
+        headless: 'new',
+      }
+    };
+  } else {
+    return {
+      puppeteer: puppeteerExtra,
+      launchOptions: {
+        headless: 'new',
+        slowMo: 50,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-gpu',
+          '--disable-dev-shm-usage',
+        ],
+      }
+    };
+  }
 }
 
-async function main() {
+export default async function handler(req, res) {
   let browser;
   const mainUrl = 'https://apnews.com/climate-and-environment';
 
   try {
     const { puppeteer, launchOptions } = await getBrowserModules();
 
-    console.log('--- Puppeteer Launch Info ---');
+    console.log('--- Puppeteer Launch Information ---');
+    console.log('Is Vercel Environment:', isVercelEnvironment);
     console.log('Launch Options:', JSON.stringify(launchOptions, null, 2));
-    console.log('--- End Info ---');
+    console.log('--- End Launch Info ---');
     
-    console.log('Attempting to launch Puppeteer...');
+    console.log('Attempting to launch Puppeteer browser...');
     browser = await puppeteer.launch(launchOptions);
     const mainPage = await browser.newPage();
 
@@ -43,7 +64,7 @@ async function main() {
 
     console.log('Waiting for articles container on main page...');
     await mainPage.waitForSelector(articlePromoSelector, { timeout: 60000 });
-    console.log(`Article containers found on main page. Extrssacting initial details (title, URL).`);
+    console.log(`Article containers found on main page. Extracting initial details (title, URL).`);
 
     const articlesToVisit = await mainPage.evaluate((promoSel, titleLinkSel, titleTextSpanSelectorArgument) => {
       const tempArticles = [];
@@ -66,7 +87,7 @@ async function main() {
 
     if (articlesToVisit.length === 0) {
       console.log('No articles found on the main page matching the specified criteria.');
-      return;
+      return res.status(200).json([]); // Return an empty array
     }
 
     console.log(`Found ${articlesToVisit.length} articles. Now processing each in a new tab to scrape dates.`);
@@ -111,19 +132,14 @@ async function main() {
 
     await mainPage.close();
     
-    console.log(`\n-----------------------------------`);
-    console.log(`Final Scraped Data:`);
-    console.log(JSON.stringify(finalProcessedArticles, null, 2));
-    console.log(`-----------------------------------`);
-    
-    console.log(`Total articles successfully processed: ${finalProcessedArticles.length}`);
-    
-    const filename = 'scraped_apnews.json';
-    fs.writeFileSync(filename, JSON.stringify(finalProcessedArticles, null, 2), 'utf8');
-    console.log(`Data saved to ${filename}`);
+    console.log(`Successfully scraped and processed ${finalProcessedArticles.length} articles.`);
+    // Return the raw array of articles
+    return res.status(200).json(finalProcessedArticles);
 
   } catch (err) {
     console.error('An unhandled error occurred during the main scraping process:', err.message);
+    // Return a structured error message
+    return res.status(500).json({ error: 'Scraping failed', details: err.message });
   } finally {
     if (browser) {
       await browser.close();
@@ -131,5 +147,3 @@ async function main() {
     }
   }
 }
-
-main();
