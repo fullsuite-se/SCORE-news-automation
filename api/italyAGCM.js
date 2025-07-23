@@ -1,4 +1,3 @@
-
 import puppeteerExtra from 'puppeteer-extra';
 import stealthPlugin from 'puppeteer-extra-plugin-stealth';
 
@@ -8,7 +7,6 @@ const isVercelEnvironment = !!process.env.AWS_REGION;
 
 async function getBrowserModules() {
   if (isVercelEnvironment) {
-    const { default: puppeteerCore } = await import('puppeteer-core');
     const { default: ChromiumClass } = await import('@sparticuz/chromium');
     
     const executablePathValue = await ChromiumClass.executablePath();
@@ -41,7 +39,7 @@ async function getBrowserModules() {
 
 export default async function handler(req, res) {
   let browser;
-  const url = 'https://www.ftc.gov/legal-library/browse/cases-proceedings?sort_by=field_date&items_per_page=20&field_mission%5B29%5D=29&search=&field_competition_topics=All&field_consumer_protection_topics=1408&field_federal_court=All&field_industry=All&field_case_status=All&field_enforcement_type=All&search_matter_number=&search_civil_action_number=&start_date=&end_date=';
+  const url = 'https://en.agcm.it/en/media/press-releases/';
 
   try {
     const { puppeteer, launchOptions } = await getBrowserModules();
@@ -58,7 +56,7 @@ export default async function handler(req, res) {
     console.log(`Navigating to: ${url}`);
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-    const mainContainerSelector = 'div.view-content';
+    const mainContainerSelector = 'div.table-responsive';
     console.log(`Waiting for main articles container: ${mainContainerSelector}...`);
     await page.waitForSelector(mainContainerSelector, { timeout: 15000 });
     console.log('Main articles container found. Proceeding to scrape individual articles.');
@@ -66,27 +64,25 @@ export default async function handler(req, res) {
     const articles = await page.evaluate((baseUrl) => {
       const results = [];
       const seenUrls = new Set();
-      const articleContainers = document.querySelectorAll('div.view-content div.views-row');
+      const articleRows = document.querySelectorAll('div.table-responsive tbody tr');
 
-      articleContainers.forEach(container => {
+      articleRows.forEach(row => {
         let title = null;
         let url = null;
         let date = 'N/A';
 
-        const titleEl = container.querySelector('article .node__content .group h3.node-title');
-        const linkEl = container.querySelector('article .node__content .group h3 a');
-        const dateEl = container.querySelector('article .node__content .group .field--name-field-date time');
+        const dateTd = row.querySelector('td:nth-child(1)');
+        const titleLinkEl = row.querySelector('td:nth-child(2) a');
 
-        if (titleEl) {
-          title = titleEl.textContent.trim();
+        if (dateTd) {
+          date = dateTd.textContent.trim();
         }
 
-        if (linkEl && linkEl.href) {
-          url = new URL(linkEl.href, baseUrl).href;
-        }
-
-        if (dateEl) {
-          date = dateEl.textContent.trim();
+        if (titleLinkEl) {
+          title = titleLinkEl.textContent.trim();
+          if (titleLinkEl.href) {
+            url = new URL(titleLinkEl.href, baseUrl).href;
+          }
         }
 
         if (title && url && !seenUrls.has(url)) {

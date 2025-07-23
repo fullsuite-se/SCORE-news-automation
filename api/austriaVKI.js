@@ -1,14 +1,9 @@
-
 import puppeteerExtra from 'puppeteer-extra';
-import stealthPlugin from 'puppeteer-extra-plugin-stealth';
-
-puppeteerExtra.use(stealthPlugin());
 
 const isVercelEnvironment = !!process.env.AWS_REGION;
 
 async function getBrowserModules() {
   if (isVercelEnvironment) {
-    const { default: puppeteerCore } = await import('puppeteer-core');
     const { default: ChromiumClass } = await import('@sparticuz/chromium');
     
     const executablePathValue = await ChromiumClass.executablePath();
@@ -41,7 +36,7 @@ async function getBrowserModules() {
 
 export default async function handler(req, res) {
   let browser;
-  const url = 'https://www.ftc.gov/legal-library/browse/cases-proceedings?sort_by=field_date&items_per_page=20&field_mission%5B29%5D=29&search=&field_competition_topics=All&field_consumer_protection_topics=1408&field_federal_court=All&field_industry=All&field_case_status=All&field_enforcement_type=All&search_matter_number=&search_civil_action_number=&start_date=&end_date=';
+  const url = 'https://konsument.at/greenwashing-check'; 
 
   try {
     const { puppeteer, launchOptions } = await getBrowserModules();
@@ -58,24 +53,36 @@ export default async function handler(req, res) {
     console.log(`Navigating to: ${url}`);
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
+    const acceptButtonSelector = 'div.cc-overlay-footer button#accept.cc-overlay-button.cc-overlay-yes';
+    console.log(`Waiting for cookie consent button: ${acceptButtonSelector}...`);
+    try {
+      await page.waitForSelector(acceptButtonSelector, { timeout: 10000 });
+      console.log('Cookie consent button found. Attempting to click...');
+      await page.click(acceptButtonSelector);
+      console.log('Cookie consent button clicked.');
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    } catch (cookieError) {
+      console.warn(`Warning: Cookie consent button not found or clickable within timeout. Proceeding without clicking. Details: ${cookieError.message}`);
+    }
+
     const mainContainerSelector = 'div.view-content';
     console.log(`Waiting for main articles container: ${mainContainerSelector}...`);
     await page.waitForSelector(mainContainerSelector, { timeout: 15000 });
-    console.log('Main articles container found. Proceeding to scrape individual articles.');
+    console.log('Main articles container found. Proceeding to scrape titles, URLs, and dates.');
 
     const articles = await page.evaluate((baseUrl) => {
       const results = [];
       const seenUrls = new Set();
-      const articleContainers = document.querySelectorAll('div.view-content div.views-row');
+      const articleContainers = document.querySelectorAll('div.views-row article.grid.col-2');
 
       articleContainers.forEach(container => {
         let title = null;
         let url = null;
         let date = 'N/A';
-
-        const titleEl = container.querySelector('article .node__content .group h3.node-title');
-        const linkEl = container.querySelector('article .node__content .group h3 a');
-        const dateEl = container.querySelector('article .node__content .group .field--name-field-date time');
+        
+        const titleEl = container.querySelector('h3');
+        const linkEl = container.querySelector('h3 a');
+        const dateEl = container.querySelector('span.meta time');
 
         if (titleEl) {
           title = titleEl.textContent.trim();
@@ -94,6 +101,8 @@ export default async function handler(req, res) {
           results.push({ title, url, date });
         }
       });
+
+      console.log(`[Browser Context] Found ${results.length} articles on the page.`);
       return results;
     }, url);
 
