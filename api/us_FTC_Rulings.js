@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 const isVercelEnvironment = !!process.env.AWS_REGION;
 
 async function getBrowserModules() {
@@ -42,6 +43,27 @@ async function getBrowserModules() {
   if (typeof ChromiumClass.executablePath === 'function') {
     executablePathValue = await ChromiumClass.executablePath();
     // executablePathValue = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+=======
+import puppeteerExtra from 'puppeteer-extra';
+
+const isVercelEnvironment = !!process.env.AWS_REGION;
+
+async function getBrowserModules() {
+  if (isVercelEnvironment) {
+    const { default: ChromiumClass } = await import('@sparticuz/chromium');
+    
+    const executablePathValue = await ChromiumClass.executablePath();
+    
+    return {
+      puppeteer: puppeteerExtra,
+      launchOptions: {
+        args: ChromiumClass.args,
+        defaultViewport: ChromiumClass.defaultViewport,
+        executablePath: executablePathValue,
+        headless: 'new',
+      }
+    };
+>>>>>>> 2cd60d5 (Changed apNews and FTC back to non-stealth)
   } else {
     executablePathValue = ChromiumClass.executablePath;
     // executablePathValue = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';

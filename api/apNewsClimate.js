@@ -1,3 +1,8 @@
+<<<<<<< HEAD
+=======
+import puppeteerExtra from 'puppeteer-extra';
+
+>>>>>>> 2cd60d5 (Changed apNews and FTC back to non-stealth)
 const isVercelEnvironment = !!process.env.AWS_REGION;
 
 async function getBrowserModules() {
@@ -105,7 +110,7 @@ export default async function handler(req, res) {
 
     if (articlesToVisit.length === 0) {
       console.log('No articles found on the main page matching the specified criteria.');
-      return res.status(200).json([]); // Return an empty array
+      return res.status(200).json([]);
     }
 
     console.log(`Found ${articlesToVisit.length} articles. Now processing each in a new tab to scrape dates.`);
@@ -151,12 +156,10 @@ export default async function handler(req, res) {
     await mainPage.close();
     
     console.log(`Successfully scraped and processed ${finalProcessedArticles.length} articles.`);
-    // Return the raw array of articles
     return res.status(200).json(finalProcessedArticles);
 
   } catch (err) {
     console.error('An unhandled error occurred during the main scraping process:', err.message);
-    // Return a structured error message
     return res.status(500).json({ error: 'Scraping failed', details: err.message });
   } finally {
     if (browser) {
