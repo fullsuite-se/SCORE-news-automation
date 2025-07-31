@@ -3,7 +3,7 @@ const isVercelEnvironment = !!process.env.AWS_REGION;
 
 async function getBrowserModules() {
   if (isVercelEnvironment) {
-    const puppeteer = await import('puppeteer-core');
+    const puppeteer = (await import('puppeteer-core')).default;
     const { default: ChromiumClass } = await import('@sparticuz/chromium');
 
     console.log('--- Debugging ChromiumClass object (Vercel Environment) ---');
@@ -27,7 +27,7 @@ async function getBrowserModules() {
       executablePath: executablePathValue
     };
   } else {
-    const puppeteer = await import('puppeteer');
+    const puppeteer = (await import('puppeteer')).default;
     return {
       puppeteer,
       chromiumArgs: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'], 
@@ -37,14 +37,9 @@ async function getBrowserModules() {
   }
 }
 
-/**
- *
- * @param {object} req
- * @param {object} res 
- */
 export default async function handler(req, res) {
   let browser; 
-  const url = 'https://www.asa.org.uk/codes-and-rulings/rulings.html?q=environmental+claims&sort_order=recent&from_date=&to_date=';
+  const url = 'https://www.consilium.europa.eu/en/press/press-releases/?keyword=&DateFrom=&DateTo=&Topic=122254&Topic=122124&Topic=122161&Topic=122178';
 
   try {
     const { puppeteer, chromiumArgs, chromiumDefaultViewport, executablePath } = await getBrowserModules();
@@ -82,30 +77,79 @@ export default async function handler(req, res) {
     browser = await puppeteer.launch(launchOptions);
     const page = await browser.newPage();
 
-    console.log(`Navigating to ${url}...`);
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 }); 
+    console.log('Navigating to Consilium page...');
+    await page.goto(url, { waitUntil: 'load', timeout: 60000 });
 
-    console.log('Waiting for ruling items (li.icon-listing-item)...');
-    await page.waitForSelector('li.icon-listing-item', { timeout: 15000 });
+    // Handle cookie banner
+    try {
+      console.log('Checking for cookie banner...');
+      await page.waitForSelector('#cookie-banner button[data-dismiss="cookie-banner"]', { timeout: 5000 });
+      await page.click('#cookie-banner button[data-dismiss="cookie-banner"]');
+      console.log('Cookie banner accepted.');
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Standard delay
+    } catch (e) {
+      console.log('No cookie banner found or failed to click:', e.message);
+    }
+
+    console.log('Waiting for article items...');
+    await page.waitForSelector('li.gsc-excerpt__item', { timeout: 15000 });
+    console.log('Article items found.');
 
     console.log('Scraping articles...');
-    const articles = await page.evaluate(() => {
-      const items = Array.from(document.querySelectorAll('li.icon-listing-item'));
-      return items.slice(0, 10).map(item => { 
-        const linkEl = item.querySelector('a');
-        const titleEl = item.querySelector('h4.heading');
+    const articlesData = await page.evaluate(() => {
+      const articles = Array.from(document.querySelectorAll('li.gsc-excerpt__item'));
+      const results = [];
 
-        const metaSpans = item.querySelectorAll('ul.meta-listing > li > span');
-        const date = metaSpans.length >= 3 ? metaSpans[2].textContent.trim() : 'N/A';
+      // Complex date extraction logic from original script
+      articles.slice(0, 10).forEach(articleEl => { // Limit to 10 articles
+        const titleEl = articleEl.querySelector('a.gsc-excerpt-item__title');
+        const timeEl = articleEl.querySelector('time.gsc-date__date');
 
-        const url = linkEl ? linkEl.href : null;
-        const title = titleEl ? titleEl.textContent.trim() : null;
+        const title = titleEl?.textContent?.trim() || null;
+        const href = titleEl?.getAttribute('href') || null;
+        const timeText = timeEl?.textContent?.trim() || null;
 
-        return { title, url, date };
-      }).filter(article => article.title && article.url);
+        let fullDate = '';
+        let el = articleEl.previousElementSibling;
+        while (el) {
+          if (el.tagName === 'H2' && el.classList.contains('gsc-excerpt-list__item-date')) {
+            fullDate = el.textContent.trim();
+            break;
+          }
+          el = el.previousElementSibling;
+        }
+        
+        // Fallback if previousElementSibling didn't find it (original logic)
+        if (!fullDate) {
+            let parent = articleEl.parentElement;
+            while (parent) {
+                const siblings = Array.from(parent.parentElement ? parent.parentElement.children : []);
+                const idx = siblings.indexOf(parent);
+                for (let i = idx - 1; i >= 0; i--) {
+                    const sibling = siblings[i];
+                    if (sibling.tagName === 'H2' && sibling.classList.contains('gsc-excerpt-list__item-date')) {
+                        fullDate = sibling.textContent.trim();
+                        break;
+                    }
+                }
+                if (fullDate) break;
+                parent = parent.parentElement;
+            }
+        }
+
+        const publishedAt = fullDate ? `${fullDate} ${timeText}` : timeText;
+        // Ensure full URL
+        const fullUrl = href ? new URL(href, 'https://www.consilium.europa.eu').href : null;
+
+        if (title && fullUrl) {
+          results.push({ title, publishedAt, url: fullUrl });
+        }
+      });
+      console.log(`Found ${results.length} articles on the page.`);
+      return results;
     });
 
-    if (articles.length === 0) {
+    if (articlesData.length === 0) {
       console.log('No articles found.');
       return res.status(200).json({ 
         success: true,
@@ -113,10 +157,10 @@ export default async function handler(req, res) {
         data: [] 
       });
     } else {
-      console.log(`Successfully scraped ${articles.length} articles.`);
+      console.log(`Successfully scraped ${articlesData.length} articles.`);
       return res.status(200).json({
         success: true,
-        data: articles
+        data: articlesData
       });
     }
 

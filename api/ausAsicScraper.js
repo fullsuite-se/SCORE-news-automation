@@ -69,10 +69,10 @@ export default async function (req, res) {
 
     await page.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-    await page.waitForSelector('li', { timeout: 60000 });
+    await page.waitForSelector('ul#nr-list', { timeout: 60000 });
 
     const articles = await page.evaluate(() => {
-      const newsItems = document.querySelectorAll('li');
+      const newsItems = document.querySelectorAll('ul#nr-list');
       const seen = new Set(); // For deduplication
       const results = [];
 

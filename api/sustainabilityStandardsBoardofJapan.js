@@ -54,7 +54,6 @@ export default async function handler(req, res) {
     if (isVercelEnvironment && (!executablePath || typeof executablePath !== 'string' || executablePath.trim() === '')) {
       console.error('ERROR: In Vercel environment, executablePath is not valid:', executablePath);
       return res.status(500).json({
-        success: false,
         error: 'Puppeteer launch failed: Missing or invalid Chromium executable path for Vercel environment.'
       });
     }
@@ -110,23 +109,17 @@ export default async function handler(req, res) {
     if (articles.length === 0) {
       console.log('No articles found.');
       return res.status(200).json({
-        success: true,
         message: 'No articles found with the specified selectors.',
-        data: []
       });
     } else {
       console.log(`Successfully scraped ${articles.length} articles.`);
       return res.status(200).json({
-        success: true,
-        data: articles
       });
     }
 
   } catch (err) {
     console.error('Error during scraping:', err);
     return res.status(500).json({
-      success: false,
-      error: 'Scraping failed',
       details: err.message || 'An unknown error occurred during scraping.'
     });
   } finally {

@@ -78,10 +78,10 @@ export default async function (req, res) {
         timeout: 60000
       });
 
-      await page.waitForSelector('div.col-12.col-md-6.mg-sec-top-post.py-3', { timeout: 10000 });
+      await page.waitForSelector('div.col-md-8', { timeout: 10000 });
 
       const newArticles = await page.evaluate(() => {
-        const nodes = document.querySelectorAll('div.col-12.col-md-6.mg-sec-top-post.py-3');
+        const nodes = document.querySelectorAll('div.col-md-8');
         const results = [];
 
         nodes.forEach(node => {
