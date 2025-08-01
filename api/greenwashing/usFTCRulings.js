@@ -1,49 +1,3 @@
-<<<<<<< HEAD
-const isVercelEnvironment = !!process.env.AWS_REGION;
-
-async function getBrowserModules() {
-  await import('puppeteer-extra-plugin-stealth/evasions/chrome.app/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/chrome.csi/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/chrome.loadTimes/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/chrome.runtime/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/defaultArgs/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/iframe.contentWindow/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/media.codecs/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/navigator.hardwareConcurrency/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/navigator.languages/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/navigator.permissions/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/navigator.plugins/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/navigator.vendor/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/navigator.webdriver/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/sourceurl/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/user-agent-override/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/webgl.vendor/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/window.outerdimensions/index.js');
-
-  const puppeteer = (await import('puppeteer-extra')).default;
-  // stealth plugin to hide puppeteer
-  const StealthPlugin = (await import('puppeteer-extra-plugin-stealth')).default;
-  puppeteer.use(StealthPlugin());
-
-  const UserPreferencesPlugin = (await import('puppeteer-extra-plugin-user-preferences')).default;
-  puppeteer.use(UserPreferencesPlugin());
-  const UserDataDirPlugin = (await import('puppeteer-extra-plugin-user-data-dir')).default;
-  puppeteer.use(UserDataDirPlugin());
-  
-  const { default: ChromiumClass } = await import('@sparticuz/chromium');
-  console.log('--- Debugging ChromiumClass object (Vercel) ---');
-  console.log('Type of ChromiumClass:', typeof ChromiumClass);
-  console.log('Keys of ChromiumClass:', Object.keys(ChromiumClass));
-  console.log('Full ChromiumClass object:', ChromiumClass);
-  console.log('ChromiumClass.executablePath is a function:', typeof ChromiumClass.executablePath === 'function');
-  console.log('ChromiumClass.args:', ChromiumClass.args);
-  console.log('ChromiumClass.defaultViewport:', ChromiumClass.defaultViewport);
-  console.log('--- End ChromiumClass Debug (Vercel) ---');
-  let executablePathValue = null;
-  if (typeof ChromiumClass.executablePath === 'function') {
-    executablePathValue = await ChromiumClass.executablePath();
-    // executablePathValue = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-=======
 import puppeteerExtra from 'puppeteer-extra';
 
 const isVercelEnvironment = !!process.env.AWS_REGION;
@@ -63,7 +17,6 @@ async function getBrowserModules() {
         headless: 'new',
       }
     };
->>>>>>> 2cd60d5 (Changed apNews and FTC back to non-stealth)
   } else {
     executablePathValue = ChromiumClass.executablePath;
     // executablePathValue = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
