@@ -1,6 +1,6 @@
 {
   "functions": {
-    "api/straitsTimesScraper.js": {
+    "api/**/*.js": {
       "maxDuration": 800
     }
   }
