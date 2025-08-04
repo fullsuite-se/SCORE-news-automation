@@ -20,12 +20,17 @@ async function getBrowserModules() {
     executablePathValue = ChromiumClass.executablePath;
   }
 
+  const launchOptions = {
+    args: ChromiumClass.args,
+    defaultViewport: ChromiumClass.defaultViewport,
+    executablePath: executablePathValue,
+    headless: ChromiumClass.headless, // Ensure headless is set appropriately for your environment
+  };
+
   return {
     puppeteer,
-    chromiumArgs: ChromiumClass.args,
-    chromiumDefaultViewport: ChromiumClass.defaultViewport,
-    executablePath: executablePathValue
-  };
+    launchOptions // Return the constructed launchOptions
+  }
 }
 
 export default async function handler(req, res) {

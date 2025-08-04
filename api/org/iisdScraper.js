@@ -2,21 +2,6 @@
 const isVercelEnvironment = !!process.env.AWS_REGION;
 
 async function getBrowserModules() {
-  const puppeteer = (await import('puppeteer-extra')).default;
-  const StealthPlugin = (await import('puppeteer-extra-plugin-stealth')).default;
-  puppeteer.use(StealthPlugin());
-
-  if (!isVercelEnvironment) {
-    return {
-      puppeteer,
-      launchOptions: {
-        headless: "new",
-        slowMo: 50,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
-      }
-    };
-  }
-
   const { default: chromium } = await import('@sparticuz/chromium');
   const executablePath = await chromium.executablePath();
 
