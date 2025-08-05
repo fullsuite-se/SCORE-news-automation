@@ -1,11 +1,4 @@
-// This file can be named 'api/scrape-ascionline.js' for Vercel deployment.
-// It uses ES Module syntax. Ensure "type": "module" is in your package.json.
 
-import puppeteerExtra from 'puppeteer-extra';
-import stealthPlugin from 'puppeteer-extra-plugin-stealth';
-
-// Use the stealth plugin for both local and Vercel environments
-puppeteerExtra.use(stealthPlugin());
 
 // This is a reliable way to check if the script is running in the Vercel environment.
 const isVercelEnvironment = !!process.env.AWS_REGION;
@@ -17,13 +10,13 @@ const isVercelEnvironment = !!process.env.AWS_REGION;
 async function getBrowserModules() {
   if (isVercelEnvironment) {
     // Vercel Environment: Use puppeteer-core and the serverless chromium.
-    const { default: ChromiumClass } = await import('@sparticuz/chromium');
+    const puppeteer = await import('@sparticuz/chromium');
     
     // Get the executable path from @sparticuz/chromium
     const executablePathValue = await ChromiumClass.executablePath();
     
     return {
-      puppeteer: puppeteerExtra, // puppeteer-extra will use puppeteer-core on Vercel
+      puppeteer, // puppeteer-extra will use puppeteer-core on Vercel
       launchOptions: {
         args: ChromiumClass.args,
         defaultViewport: ChromiumClass.defaultViewport,
@@ -34,7 +27,7 @@ async function getBrowserModules() {
   } else {
     // Local Environment: Use local puppeteer installation with optional debug features.
     return {
-      puppeteer: puppeteerExtra,
+      puppeteer,
       launchOptions: {
         headless: 'new', // Use "new" headless mode for consistency and performance
         slowMo: 50,      // Slows down Puppeteer operations by 50ms for visual debugging

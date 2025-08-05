@@ -1,13 +1,8 @@
-import puppeteerExtra from 'puppeteer-extra';
-import stealthPlugin from 'puppeteer-extra-plugin-stealth';
-
-puppeteerExtra.use(stealthPlugin());
-
 const isVercelEnvironment = !!process.env.AWS_REGION;
 
 async function getBrowserModules() {
   if (isVercelEnvironment) {
-    const { default: ChromiumClass } = await import('@sparticuz/chromium');
+    const puppeteer = await import('@sparticuz/chromium');
     
     const executablePathValue = await ChromiumClass.executablePath();
     
@@ -22,7 +17,7 @@ async function getBrowserModules() {
     };
   } else {
     return {
-      puppeteer: puppeteerExtra,
+      puppeteer,
       launchOptions: {
         headless: 'new',
         slowMo: 50,
