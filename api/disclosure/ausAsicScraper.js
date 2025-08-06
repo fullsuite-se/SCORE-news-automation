@@ -1,121 +1,102 @@
-const isVercelEnvironment = !!process.env.AWS_REGION;
+import fs from 'fs';
+import path from 'path';
+import puppeteerExtra from 'puppeteer-extra';
+import stealthPlugin from 'puppeteer-extra-plugin-stealth';
+
+puppeteerExtra.use(stealthPlugin());
 
 async function getBrowserModules() {
-  const puppeteer = await import('puppeteer-core');
-  const { default: ChromiumClass } = await import('@sparticuz/chromium');
-
-  console.log('--- Debugging ChromiumClass object (Vercel) ---');
-  console.log('Type of ChromiumClass:', typeof ChromiumClass);
-  console.log('Keys of ChromiumClass:', Object.keys(ChromiumClass));
-  console.log('Full ChromiumClass object:', ChromiumClass);
-  console.log('ChromiumClass.executablePath is a function:', typeof ChromiumClass.executablePath === 'function');
-  console.log('ChromiumClass.args:', ChromiumClass.args);
-  console.log('ChromiumClass.defaultViewport:', ChromiumClass.defaultViewport);
-  console.log('--- End ChromiumClass Debug (Vercel) ---');
-
-  let executablePathValue = null;
-  if (typeof ChromiumClass.executablePath === 'function') {
-    executablePathValue = await ChromiumClass.executablePath();
-  } else {
-    executablePathValue = ChromiumClass.executablePath;
-  }
-
+  const puppeteerInstance = puppeteerExtra;
   return {
-    puppeteer,
-    chromiumArgs: ChromiumClass.args,
-    chromiumDefaultViewport: ChromiumClass.defaultViewport,
-    executablePath: executablePathValue
+    puppeteer: puppeteerInstance,
+    launchOptions: {
+      headless: false,
+      slowMo: 50,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-gpu',
+        '--disable-dev-shm-usage',
+      ],
+    }
   };
 }
 
-export default async function (req, res) {
-  const { puppeteer, chromiumArgs, chromiumDefaultViewport, executablePath } = await getBrowserModules();
-
-  console.log('--- Puppeteer Launch Debug Info (Vercel) ---');
-  console.log('isVercelEnvironment:', isVercelEnvironment);
-  console.log('chromiumArgs (from @sparticuz/chromium):', chromiumArgs);
-  console.log('chromiumDefaultViewport (from @sparticuz/chromium):', chromiumDefaultViewport);
-  console.log('Executable Path (from @sparticuz/chromium):', executablePath);
-  console.log('--- End Debug Info (Vercel) ---');
-
-  if (isVercelEnvironment && (!executablePath || typeof executablePath !== 'string' || executablePath.trim() === '')) {
-    console.error('ERROR: In Vercel environment, executablePath is not valid:', executablePath);
-    return res.status(500).json({
-      error: 'Puppeteer launch failed: Missing or invalid Chromium executable path for Vercel environment.'
-    });
-  }
-
-  const launchOptions = isVercelEnvironment
-    ? {
-        args: chromiumArgs,
-        defaultViewport: chromiumDefaultViewport,
-        executablePath: executablePath,
-        headless: true,
-      }
-    : {
-        headless: true,
-        defaultViewport: null,
-        slowMo: 50,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
-      };
-
+async function main() {
   let browser;
-  const baseUrl = 'https://www.asic.gov.au/newsroom/search/?tag=sustainable%20finance';
+  const url = 'https://www.asic.gov.au/newsroom/search/?tag=sustainable%20finance';
 
   try {
-    console.log('Attempting to launch Puppeteer with options:', JSON.stringify(launchOptions, null, 2));
-    browser = await puppeteer.launch(launchOptions);
+    const { puppeteer: puppeteerToLaunch, launchOptions } = await getBrowserModules();
+
+    console.log('--- Puppeteer Launch Information ---');
+    console.log('Launch Options:', JSON.stringify(launchOptions, null, 2));
+    console.log('--- End Launch Info ---');
+    
+    console.log('Attempting to launch Puppeteer browser...');
+    browser = await puppeteerToLaunch.launch(launchOptions);
     const page = await browser.newPage();
 
-    await page.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    console.log(`Navigating to ASIC Newsroom search results: ${url}`);
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-    await page.waitForSelector('ul#nr-list', { timeout: 60000 });
+    const articleListContainerSelector = 'ul#nr-list';
+    const articleItemSelector = `${articleListContainerSelector} li`;
 
-    const articles = await page.evaluate(() => {
-      const newsItems = document.querySelectorAll('ul#nr-list');
-      const seen = new Set(); // For deduplication
+    console.log(`Waiting for individual article items to load: ${articleItemSelector}...`);
+    try {
+      // CRITICAL FIX: Wait for the list items themselves, not just the container
+      await page.waitForSelector(articleItemSelector, { timeout: 30000 });
+      console.log('Individual article items found. Starting scraping process.');
+    } catch (error) {
+      console.error('ERROR: No article list items found within timeout.', error.message);
+      return; 
+    }
+
+    const articles = await page.evaluate((listContainerSel) => {
+      const items = Array.from(document.querySelectorAll(`${listContainerSel} li`));
+      const seenUrls = new Set();
       const results = [];
 
-      newsItems.forEach(item => {
-        let title = null;
-        let url = null;
-        let date = null;
-
-        const titleUrlEl = item.querySelector('h3 a');
-        if (titleUrlEl) {
-          title = titleUrlEl.textContent.trim();
-          url = new URL(titleUrlEl.getAttribute('href'), window.location.origin).href;
-        }
-
+      items.forEach(item => {
+        const linkEl = item.querySelector('h3 a');
         const dateEl = item.querySelector('p.nr-date');
-        if (dateEl) {
-          date = dateEl.textContent.trim();
-        }
 
-        if (title && url && date && !seen.has(url)) { // Ensure all data points exist and URL is unique
-          seen.add(url);
+        const url = linkEl?.href;
+        const title = linkEl?.textContent?.trim();
+        const date = dateEl?.textContent?.trim().replace(/^Date:\s*/i, '');
+
+        if (title && url && date && !seenUrls.has(url)) {
+          seenUrls.add(url);
           results.push({ title, url, date });
         }
       });
-
-      console.log(`Found ${results.length} articles on listing page.`);
+      console.log(`[Browser Context] Found ${results.length} articles on listing page.`);
       return results.slice(0, 10);
-    });
+    }, articleListContainerSelector);
 
     if (articles.length === 0) {
-      console.warn('No articles found.');
-      return res.status(200).json({ message: 'No articles found' });
+      console.warn('No articles found matching the specified criteria after scraping.');
+    } else {
+      console.log(`Successfully scraped ${articles.length} articles.`);
+      console.log('\n--- Scraped Data Preview (First 5 Articles) ---');
+      console.log(JSON.stringify(articles.slice(0, 5), null, 2));
+      console.log('--- End Scraped Data Preview ---');
+      
+      const filename = 'asic_sustainable_finance_articles.json';
+      fs.writeFileSync(path.resolve(filename), JSON.stringify(articles, null, 2), 'utf8');
+      console.log(`\nData successfully saved to ${filename} at: ${path.resolve(filename)}`);
     }
 
-    console.log(`Returning ${articles.length} articles.`);
-    res.status(200).json(articles);
-
   } catch (err) {
-    console.error('Scraping failed:', err.message);
-    res.status(500).json({ error: 'Scraping failed', details: err.message });
+    console.error('An unhandled error occurred during the main scraping process:', err.message);
+    console.error(err);
   } finally {
     if (browser) {
+      console.log('Closing browser...');
       await browser.close();
     }
   }
 }
+
+main();

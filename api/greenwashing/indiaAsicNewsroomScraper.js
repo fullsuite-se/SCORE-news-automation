@@ -1,36 +1,36 @@
+import puppeteerExtra from 'puppeteer-extra';
+import stealthPlugin from 'puppeteer-extra-plugin-stealth';
 
+puppeteerExtra.use(stealthPlugin());
 
-// This is a reliable way to check if the script is running in the Vercel environment.
 const isVercelEnvironment = !!process.env.AWS_REGION;
 
 /**
- * Dynamically imports and configures Puppeteer based on the environment.
  * @returns {object} An object containing the Puppeteer instance and its launch options.
  */
 async function getBrowserModules() {
   if (isVercelEnvironment) {
     // Vercel Environment: Use puppeteer-core and the serverless chromium.
-    const puppeteer = await import('@sparticuz/chromium');
+    const { default: ChromiumClass } = await import('@sparticuz/chromium');
     
-    // Get the executable path from @sparticuz/chromium
     const executablePathValue = await ChromiumClass.executablePath();
     
     return {
-      puppeteer, // puppeteer-extra will use puppeteer-core on Vercel
+      puppeteer: puppeteerExtra,
       launchOptions: {
         args: ChromiumClass.args,
         defaultViewport: ChromiumClass.defaultViewport,
         executablePath: executablePathValue,
-        headless: 'new', // Must be 'new' for serverless functions
+        headless: 'new',
       }
     };
   } else {
     // Local Environment: Use local puppeteer installation with optional debug features.
     return {
-      puppeteer,
+      puppeteer: puppeteerExtra,
       launchOptions: {
-        headless: 'new', // Use "new" headless mode for consistency and performance
-        slowMo: 50,      // Slows down Puppeteer operations by 50ms for visual debugging
+        headless: 'new',
+        slowMo: 50,
         args: [
           '--no-sandbox',
           '--disable-setuid-sandbox',
@@ -43,7 +43,6 @@ async function getBrowserModules() {
 }
 
 /**
- * Vercel serverless function handler. This is the entry point for the function.
  * @param {object} req - The Vercel request object.
  * @param {object} res - The Vercel response object.
  */
@@ -52,7 +51,6 @@ export default async function handler(req, res) {
   const url = 'https://www.ascionline.in/complaint-outcomes/';
 
   try {
-    // Get the configured Puppeteer instance and launch options based on the environment
     const { puppeteer, launchOptions } = await getBrowserModules();
 
     console.log('--- Puppeteer Launch Information ---');
@@ -87,7 +85,6 @@ export default async function handler(req, res) {
       console.log('Article list container found.');
     } catch (error) {
       console.error('ERROR: Article list container not found within timeout:', error.message);
-      // Return a 500 status if the main container is crucial and not found
       return res.status(500).json({ success: false, error: 'Scraping failed: Article list container not found.' });
     }
 
@@ -126,7 +123,6 @@ export default async function handler(req, res) {
     await new Promise(resolve => setTimeout(resolve, 5000));
     console.log('Finished waiting for filters to load.');
 
-    // --- Show More Button Handling ---
     try {
       const showMoreButton = await page.$('button.showMoreCom');
       if (showMoreButton) {
@@ -139,12 +135,11 @@ export default async function handler(req, res) {
     } catch (error) {
       console.error('ERROR: Error interacting with "Show More" button:', error.message);
     }
-    // --- End Show More Button Handling ---
 
     console.log('Starting scraping process within the article list container.');
     const articles = await page.evaluate((listContainerSel) => {
       const items = Array.from(document.querySelectorAll(`${listContainerSel} li`));
-      const seenUrls = new Set();
+      const seen = new Set();
       const results = [];
 
       items.forEach(item => {
@@ -161,12 +156,12 @@ export default async function handler(req, res) {
           date = spanlineSpans[2].textContent.trim();
         }
 
-        if (title && url && !seenUrls.has(url)) {
-          seenUrls.add(url);
+        if (title && url && !seen.has(url)) {
+          seen.add(url);
           results.push({ title, url, date });
         }
       });
-      console.log(`[Browser Context] Found ${results.length} articles on listing page.`);
+      console.log(`Found ${results.length} articles on listing page.`);
       return results.slice(0, 10);
     }, articleListContainerSelector);
 

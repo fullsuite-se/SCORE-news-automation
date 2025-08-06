@@ -1,6 +1,7 @@
 import puppeteerExtra from 'puppeteer-extra';
 import stealthPlugin from 'puppeteer-extra-plugin-stealth';
 
+// Use the stealth plugin for both local and Vercel environments
 puppeteerExtra.use(stealthPlugin());
 
 const isVercelEnvironment = !!process.env.AWS_REGION;
@@ -12,17 +13,17 @@ async function getBrowserModules() {
     const executablePathValue = await ChromiumClass.executablePath();
     
     return {
-      puppeteer: puppeteerExtra,
+      puppeteer: puppeteerExtra, // puppeteer-extra will use puppeteer-core on Vercel
       launchOptions: {
         args: ChromiumClass.args,
         defaultViewport: ChromiumClass.defaultViewport,
         executablePath: executablePathValue,
-        headless: 'new',
+        headless: 'new', // Must be 'new' for serverless functions
       }
     };
   } else {
     return {
-      puppeteer: puppeteerExtra,
+      puppeteer: puppeteerExtra, // puppeteer-extra will use puppeteer for local
       launchOptions: {
         headless: 'new',
         slowMo: 50,
@@ -39,7 +40,7 @@ async function getBrowserModules() {
 
 export default async function handler(req, res) {
   let browser;
-  const url = 'https://www.asic.gov.au/newsroom/search/?tag=sustainable%20finance';
+  const url = 'https://www.hkicpa.org.hk/en/News/News-Release';
 
   try {
     const { puppeteer, launchOptions } = await getBrowserModules();
@@ -53,51 +54,54 @@ export default async function handler(req, res) {
     browser = await puppeteer.launch(launchOptions);
     const page = await browser.newPage();
 
+    console.log(`Navigating to: ${url}`);
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-    const articleListContainerSelector = 'ul#nr-list';
-    console.log(`Waiting for article list container: ${articleListContainerSelector}...`);
+    const articleListContainerSelector = 'div#blist';
+    const articleItemSelector = `${articleListContainerSelector} div[tabindex="0"]`;
+    console.log(`Waiting for individual article items to load: ${articleItemSelector}...`);
+
     try {
-      await page.waitForSelector(`${articleListContainerSelector} li`, { timeout: 60000 });
-      console.log('Article list items found.');
+      await page.waitForSelector(articleItemSelector, { timeout: 15000 });
+      console.log('Individual article items found. Starting scraping process.');
     } catch (error) {
-      console.error('ERROR: Article list items not found within timeout:', error.message);
+      console.error('ERROR: No article items found within timeout:', error.message);
       return res.status(500).json({ success: false, error: 'Scraping failed: Article items not found.' });
     }
 
-    const articles = await page.evaluate((listContainerSel) => {
-      const items = document.querySelectorAll(`${listContainerSel} li`);
-      const seen = new Set();
+    const articles = await page.evaluate((baseUrl) => {
+      const items = Array.from(document.querySelectorAll(`div#blist div[tabindex="0"]`));
+      const seenUrls = new Set();
       const results = [];
 
       items.forEach(item => {
         let title = null;
         let url = null;
-        let date = null;
+        let date = 'N/A';
 
-        const titleUrlEl = item.querySelector('h3 a');
-        if (titleUrlEl) {
-          title = titleUrlEl.textContent.trim();
-          url = new URL(titleUrlEl.href, window.location.origin).href;
+        const linkEl = item.querySelector('div.wrap h2 a');
+        const dateEl = item.querySelector('div.btm strong');
+
+        if (linkEl) {
+          title = linkEl.textContent.trim();
+          url = new URL(linkEl.href, baseUrl).href;
         }
 
-        const dateEl = item.querySelector('p.nr-date');
         if (dateEl) {
           date = dateEl.textContent.trim();
-          date = date.replace(/^Date:\s*/i, '');
         }
 
-        if (title && url && date && !seen.has(url)) {
-          seen.add(url);
+        if (title && url && !seenUrls.has(url)) {
+          seenUrls.add(url);
           results.push({ title, url, date });
         }
       });
-      console.log(`Found ${results.length} articles on listing page.`);
-      return results.slice(0, 10);
-    }, articleListContainerSelector);
+      console.log(`[Browser Context] Found ${results.length} articles on listing page.`);
+      return results;
+    }, url);
 
     if (articles.length === 0) {
-      console.warn('No articles found.');
+      console.warn('No articles found matching the specified criteria after scraping.');
       return res.status(200).json({ success: true, message: 'No articles found', data: [] });
     }
 
@@ -105,7 +109,7 @@ export default async function handler(req, res) {
     res.status(200).json({ success: true, data: articles });
 
   } catch (err) {
-    console.error('An unhandled error occurred during the scraping process:', err.message);
+    console.error('An unhandled error occurred during the main scraping process:', err.message);
     console.error(err);
     res.status(500).json({ success: false, error: 'Scraping failed', details: err.message });
   } finally {

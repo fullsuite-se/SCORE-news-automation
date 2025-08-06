@@ -1,15 +1,7 @@
 import puppeteerExtra from 'puppeteer-extra';
 import stealthPlugin from 'puppeteer-extra-plugin-stealth';
-import RecaptchaPlugin from 'puppeteer-extra-plugin-recaptcha';
 
 puppeteerExtra.use(stealthPlugin());
-
-puppeteerExtra.use(
-  RecaptchaPlugin({
-    provider: { id: '2captcha', token: 'YOUR_2CAPTCHA_API_KEY' }, // Replace with your API key
-    visualFeedback: true,
-  })
-);
 
 const isVercelEnvironment = !!process.env.AWS_REGION;
 
@@ -33,7 +25,7 @@ async function getBrowserModules() {
     return {
       puppeteer: puppeteerInstance,
       launchOptions: {
-        headless: false, // Set to false for a visible browser, useful for debugging
+        headless: 'new', // Use "new" headless mode for consistency and performance
         slowMo: 50,
         args: [
           '--no-sandbox',
@@ -48,10 +40,10 @@ async function getBrowserModules() {
 
 export default async function handler(req, res) {
   let browser;
-  const url = 'https://www.asic.gov.au/newsroom/search/?tag=sustainable%20finance';
+  const url = 'https://www.secp.gov.pk/media-center/press-releases/';
 
   try {
-    const { puppeteer: puppeteerToLaunch, launchOptions } = await getBrowserModules();
+    const { puppeteer, launchOptions } = await getBrowserModules();
 
     console.log('--- Puppeteer Launch Information ---');
     console.log('Is Vercel Environment:', isVercelEnvironment);
@@ -59,50 +51,69 @@ export default async function handler(req, res) {
     console.log('--- End Launch Info ---');
     
     console.log('Attempting to launch Puppeteer browser...');
-    browser = await puppeteerToLaunch.launch(launchOptions);
+    browser = await puppeteer.launch(launchOptions);
     const page = await browser.newPage();
 
-    console.log(`Navigating to ASIC Newsroom search results: ${url}`);
+    console.log(`Navigating to: ${url}`);
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-    // --- Cloudflare Bypass / CAPTCHA Solving Logic ---
-    console.log('Checking for reCAPTCHA or hCaptcha challenges...');
-    await page.solveRecaptchas();
-    console.log('CAPTCHA solving attempted. Proceeding with scraping...');
-    await page.waitForNavigation({ waitUntil: 'domcontentloaded' }).catch(() => {});
-    // --- End Cloudflare Bypass Logic ---
-
-    const articleListContainerSelector = 'ul#nr-list';
-    console.log(`Waiting for article list container: ${articleListContainerSelector}...`);
+    const closeButtonSelector = 'button#sgpb-close-button';
+    console.log(`Waiting for close button: ${closeButtonSelector}...`);
     try {
-      await page.waitForSelector(articleListContainerSelector, { timeout: 15000 });
-      console.log('Article list container found.');
-    } catch (error) {
-      console.error('ERROR: Article list container not found within timeout:', error.message);
-      return res.status(500).json({ success: false, error: 'Scraping failed: Article list container not found.' });
+      await page.waitForSelector(closeButtonSelector, { timeout: 10000 });
+      console.log('Close button found. Attempting to click...');
+      await page.click(closeButtonSelector);
+      console.log('Close button clicked.');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    } catch (popupError) {
+      console.warn(`Warning: Close button not found or clickable within timeout. Proceeding without clicking. Details: ${popupError.message}`);
     }
 
-    console.log('Starting scraping process within the article list container.');
+    const articleListContainerSelector = 'table#DataTables_Table_0 tbody';
+    const articleItemSelector = `${articleListContainerSelector} tr`;
+    console.log(`Waiting for individual article items to load: ${articleItemSelector}...`);
+
+    try {
+      await page.waitForSelector(articleItemSelector, { timeout: 15000 });
+      console.log('Individual article items found. Starting scraping process.');
+    } catch (error) {
+      console.error('ERROR: No article items found within timeout:', error.message);
+      return res.status(500).json({ success: false, error: 'Scraping failed: Article items not found.' });
+    }
+
     const articles = await page.evaluate((listContainerSel) => {
-      const items = Array.from(document.querySelectorAll(`${listContainerSel} li`));
+      const items = Array.from(document.querySelectorAll(`${listContainerSel} tr`));
       const seenUrls = new Set();
       const results = [];
 
       items.forEach(item => {
-        const linkEl = item.querySelector('h3 a');
-        const dateEl = item.querySelector('p.nr-date');
+        let title = null;
+        let url = null;
+        let date = 'N/A';
 
-        const url = linkEl?.href;
-        const title = linkEl?.textContent?.trim();
-        const date = dateEl?.textContent?.trim().replace(/^Date:\s*/i, '');
+        const titleEl = item.querySelector('td.download-title');
+        const linkEl = item.querySelector('td.download-link a');
+        const dateEl = item.querySelector('td.download-date');
 
-        if (title && url && date && !seenUrls.has(url)) {
+        if (titleEl) {
+          title = titleEl.textContent.trim();
+        }
+        
+        if (linkEl && linkEl.href) {
+          url = new URL(linkEl.href, window.location.origin).href;
+        }
+
+        if (dateEl) {
+          date = dateEl.textContent.trim();
+        }
+
+        if (title && url && !seenUrls.has(url)) {
           seenUrls.add(url);
           results.push({ title, url, date });
         }
       });
-      console.log(`Found ${results.length} articles on listing page.`);
-      return results.slice(0, 10);
+      console.log(`[Browser Context] Found ${results.length} articles on listing page.`);
+      return results;
     }, articleListContainerSelector);
 
     if (articles.length === 0) {
@@ -119,8 +130,8 @@ export default async function handler(req, res) {
     return res.status(500).json({ success: false, error: 'Scraping failed', details: err.message });
   } finally {
     if (browser) {
-      console.log('Closing browser...');
       await browser.close();
+      console.log('Browser closed.');
     }
   }
 }
