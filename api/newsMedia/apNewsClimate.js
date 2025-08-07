@@ -1,51 +1,72 @@
 const isVercelEnvironment = !!process.env.AWS_REGION;
 
 async function getBrowserModules() {
-  const puppeteer = await import('puppeteer-core');
-  const { default: ChromiumClass } = await import('@sparticuz/chromium');
+  let puppeteerInstance;
+  let launchOptions;
 
-  console.log('--- Debugging ChromiumClass object (Vercel) ---');
-  console.log('Type of ChromiumClass:', typeof ChromiumClass);
-  console.log('Keys of ChromiumClass:', Object.keys(ChromiumClass));
-  console.log('Full ChromiumClass object:', ChromiumClass);
-  console.log('ChromiumClass.executablePath is a function:', typeof ChromiumClass.executablePath === 'function');
-  console.log('ChromiumClass.args:', ChromiumClass.args);
-  console.log('ChromiumClass.defaultViewport:', ChromiumClass.defaultViewport);
-  console.log('--- End ChromiumClass Debug (Vercel) ---');
+  const stealthPluginModule = await import('puppeteer-extra-plugin-stealth');
+  const stealthPlugin = stealthPluginModule.default;
 
-  let executablePathValue = null;
-  if (typeof ChromiumClass.executablePath === 'function') {
-    executablePathValue = await ChromiumClass.executablePath();
+  if (isVercelEnvironment) {
+    const puppeteerCoreModule = await import('puppeteer-core');
+    const { default: Chromium } = await import('@sparticuz/chromium');
+
+    puppeteerInstance = puppeteerCoreModule;
+    puppeteerInstance.use(stealthPlugin());
+
+    const executablePath = await Chromium.executablePath();
+    if (!executablePath) {
+      throw new Error('Chromium executable path not found on Vercel.');
+    }
+
+    launchOptions = {
+      args: Chromium.args,
+      defaultViewport: Chromium.defaultViewport,
+      executablePath: executablePath,
+      headless: true,
+    };
+
+    console.log('--- Vercel Environment Setup ---');
+    console.log('Using puppeteer-core and @sparticuz/chromium.');
+    console.log('Executable Path:', executablePath);
+    console.log('------------------------------');
+
   } else {
-    executablePathValue = ChromiumClass.executablePath;
+    const puppeteerExtraModule = await import('puppeteer-extra');
+    puppeteerInstance = puppeteerExtraModule.default;
+    puppeteerInstance.use(stealthPlugin());
+
+    launchOptions = {
+      headless: 'new',
+      slowMo: 50,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-gpu',
+        '--disable-dev-shm-usage',
+      ],
+    };
+
+    console.log('--- Local Environment Setup ---');
+    console.log('Using puppeteer-extra.');
+    console.log('---------------------------');
   }
 
-  const launchOptions = {
-    args: ChromiumClass.args,
-    defaultViewport: ChromiumClass.defaultViewport,
-    executablePath: executablePathValue,
-    headless: ChromiumClass.headless, // Ensure headless is set appropriately for your environment
-  };
-
-  return {
-    puppeteer,
-    launchOptions // Return the constructed launchOptions
-  }
+  return { puppeteer: puppeteerInstance, launchOptions };
 }
 
-export default async function handler(req, res) {
+export default async function (req, res) {
   let browser;
   const mainUrl = 'https://apnews.com/climate-and-environment';
 
   try {
     const { puppeteer, launchOptions } = await getBrowserModules();
 
-    console.log('--- Puppeteer Launch Information ---');
-    console.log('Is Vercel Environment:', isVercelEnvironment);
+    console.log('--- Puppeteer Launch Info ---');
     console.log('Launch Options:', JSON.stringify(launchOptions, null, 2));
     console.log('--- End Launch Info ---');
-    
-    console.log('Attempting to launch Puppeteer browser...');
+
+    console.log('Attempting to launch browser...');
     browser = await puppeteer.launch(launchOptions);
     const mainPage = await browser.newPage();
 
@@ -60,7 +81,7 @@ export default async function handler(req, res) {
 
     console.log('Waiting for articles container on main page...');
     await mainPage.waitForSelector(articlePromoSelector, { timeout: 60000 });
-    console.log(`Article containers found on main page. Extracting initial details (title, URL).`);
+    console.log('Article containers found. Extracting initial details...');
 
     const articlesToVisit = await mainPage.evaluate((promoSel, titleLinkSel, titleTextSpanSelectorArgument) => {
       const tempArticles = [];
@@ -82,11 +103,12 @@ export default async function handler(req, res) {
     }, articlePromoSelector, titleLinkSelector, titleTextSpanSelector);
 
     if (articlesToVisit.length === 0) {
-      console.log('No articles found on the main page matching the specified criteria.');
-      return res.status(200).json([]);
+      console.log('No articles found on the main page.');
+      await mainPage.close();
+      return res.status(200).json({ message: 'No articles found' });
     }
 
-    console.log(`Found ${articlesToVisit.length} articles. Now processing each in a new tab to scrape dates.`);
+    console.log(`Found ${articlesToVisit.length} articles. Now scraping dates.`);
 
     const finalProcessedArticles = [];
 
@@ -96,7 +118,7 @@ export default async function handler(req, res) {
 
       try {
         newTab = await browser.newPage();
-        console.log(`- Opening new tab for article ${i + 1}/${articlesToVisit.length}: ${article.url}`);
+        console.log(`- Opening tab for article ${i + 1}/${articlesToVisit.length}: ${article.url}`);
         await newTab.goto(article.url, { waitUntil: 'domcontentloaded', timeout: 60000 });
         
         let date = null;
@@ -108,7 +130,7 @@ export default async function handler(req, res) {
           }, articlePageDateSelector);
           console.log(`  Scraped Date: ${date || 'N/A'}`);
         } catch (dateErr) {
-          console.warn(`  Warning: Could not find date for "${article.title}" on its page: ${dateErr.message}`);
+          console.warn(`  Warning: Could not find date for "${article.title}": ${dateErr.message}`);
           date = null;
         }
         
@@ -118,8 +140,8 @@ export default async function handler(req, res) {
         
         finalProcessedArticles.push(articleWithDate);
       } catch (err) {
-        console.error(`Error processing tab for article "${article.title}" (${article.url}): ${err.message}`);
-        finalProcessedArticles.push({ ...article, date: null, status: `Error visiting/processing: ${err.message}` });
+        console.error(`Error processing article "${article.title}" (${article.url}): ${err.message}`);
+        finalProcessedArticles.push({ ...article, date: null, status: `Error: ${err.message}` });
         if (newTab) {
           await newTab.close().catch(e => console.error(`Error closing errored tab: ${e.message}`));
         }
@@ -128,12 +150,16 @@ export default async function handler(req, res) {
 
     await mainPage.close();
     
-    console.log(`Successfully scraped and processed ${finalProcessedArticles.length} articles.`);
-    return res.status(200).json(finalProcessedArticles);
+    console.log(`\n-----------------------------------`);
+    console.log(`Final Scraped Data:`);
+    console.log(JSON.stringify(finalProcessedArticles, null, 2));
+    console.log(`-----------------------------------`);
+    
+    res.status(200).json(finalProcessedArticles);
 
   } catch (err) {
-    console.error('An unhandled error occurred during the main scraping process:', err.message);
-    return res.status(500).json({ error: 'Scraping failed', details: err.message });
+    console.error('An unhandled error occurred during scraping:', err.message);
+    res.status(500).json({ error: 'Scraping failed', details: err.message });
   } finally {
     if (browser) {
       await browser.close();

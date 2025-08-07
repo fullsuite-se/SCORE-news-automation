@@ -1,49 +1,59 @@
-import puppeteerExtra from 'puppeteer-extra';
-import stealthPlugin from 'puppeteer-extra-plugin-stealth';
-import RecaptchaPlugin from 'puppeteer-extra-plugin-recaptcha';
-
-puppeteerExtra.use(stealthPlugin());
-
-puppeteerExtra.use(
-  RecaptchaPlugin({
-    provider: { id: '2captcha', token: 'YOUR_2CAPTCHA_API_KEY' }, // Replace with your API key
-    visualFeedback: true,
-  })
-);
-
 const isVercelEnvironment = !!process.env.AWS_REGION;
 
 async function getBrowserModules() {
+  let puppeteerInstance;
+  let launchOptions;
+
+  const stealthPluginModule = await import('puppeteer-extra-plugin-stealth');
+  const stealthPlugin = stealthPluginModule.default;
+  
+  const recaptchaPluginModule = await import('puppeteer-extra-plugin-recaptcha');
+  const RecaptchaPlugin = recaptchaPluginModule.default;
+
   if (isVercelEnvironment) {
-    const { default: ChromiumClass } = await import('@sparticuz/chromium');
+    const puppeteerCoreModule = await import('puppeteer-core');
+    const { default: Chromium } = await import('@sparticuz/chromium');
     
-    const executablePathValue = await ChromiumClass.executablePath();
+    puppeteerInstance = puppeteerCoreModule;
+    // Apply the stealth plugin to the puppeteer-core instance
+    puppeteerInstance.use(stealthPlugin());
+
+    const executablePath = await Chromium.executablePath();
+    if (!executablePath) {
+      throw new Error('Chromium executable path not found on Vercel.');
+    }
     
-    return {
-      puppeteer: puppeteerExtra,
-      launchOptions: {
-        args: ChromiumClass.args,
-        defaultViewport: ChromiumClass.defaultViewport,
-        executablePath: executablePathValue,
-        headless: 'new', // Must be 'new' for serverless functions
-      }
+    launchOptions = {
+      args: Chromium.args,
+      defaultViewport: Chromium.defaultViewport,
+      executablePath: executablePath,
+      headless: 'new',
     };
   } else {
-    const puppeteerInstance = puppeteerExtra;
-    return {
-      puppeteer: puppeteerInstance,
-      launchOptions: {
-        headless: false, // Set to false for a visible browser, useful for debugging
-        slowMo: 50,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-gpu',
-          '--disable-dev-shm-usage',
-        ],
-      }
+    const puppeteerExtraModule = await import('puppeteer-extra');
+    puppeteerInstance = puppeteerExtraModule.default;
+    // Apply all plugins for local development
+    puppeteerInstance.use(stealthPlugin());
+    puppeteerInstance.use(
+      RecaptchaPlugin({
+        provider: { id: '2captcha', token: 'YOUR_2CAPTCHA_API_KEY' },
+        visualFeedback: true,
+      })
+    );
+
+    launchOptions = {
+      headless: 'new',
+      slowMo: 50,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-gpu',
+        '--disable-dev-shm-usage',
+      ],
     };
   }
+
+  return { puppeteer: puppeteerInstance, launchOptions };
 }
 
 export default async function handler(req, res) {
@@ -51,7 +61,7 @@ export default async function handler(req, res) {
   const url = 'https://www.asic.gov.au/newsroom/search/?tag=sustainable%20finance';
 
   try {
-    const { puppeteer: puppeteerToLaunch, launchOptions } = await getBrowserModules();
+    const { puppeteer, launchOptions } = await getBrowserModules();
 
     console.log('--- Puppeteer Launch Information ---');
     console.log('Is Vercel Environment:', isVercelEnvironment);
@@ -59,18 +69,20 @@ export default async function handler(req, res) {
     console.log('--- End Launch Info ---');
     
     console.log('Attempting to launch Puppeteer browser...');
-    browser = await puppeteerToLaunch.launch(launchOptions);
+    browser = await puppeteer.launch(launchOptions);
     const page = await browser.newPage();
 
     console.log(`Navigating to ASIC Newsroom search results: ${url}`);
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-    // --- Cloudflare Bypass / CAPTCHA Solving Logic ---
-    console.log('Checking for reCAPTCHA or hCaptcha challenges...');
-    await page.solveRecaptchas();
-    console.log('CAPTCHA solving attempted. Proceeding with scraping...');
-    await page.waitForNavigation({ waitUntil: 'domcontentloaded' }).catch(() => {});
-    // --- End Cloudflare Bypass Logic ---
+    // --- CAPTCHA Solving Logic (Enabled locally, skipped on Vercel) ---
+    if (!isVercelEnvironment && typeof page.solveRecaptchas === 'function') {
+      console.log('Checking for reCAPTCHA or hCaptcha challenges...');
+      await page.solveRecaptchas();
+      console.log('CAPTCHA solving attempted. Proceeding with scraping...');
+      await page.waitForNavigation({ waitUntil: 'domcontentloaded' }).catch(() => {});
+    }
+    // --- End CAPTCHA Logic ---
 
     const articleListContainerSelector = 'ul#nr-list';
     console.log(`Waiting for article list container: ${articleListContainerSelector}...`);
