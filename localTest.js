@@ -26,33 +26,39 @@ async function scrapeArticlesWithPuppeteer(url) {
 
         // Use page.evaluate() to run JavaScript code within the context of the browser page.
         // This is where you'll use the DOM manipulation logic similar to the client-side script.
+
+    
+        // await page.waitForSelector('div#content-core', { timeout: 10000 });
+
+
         const scrapedData = await page.evaluate((maxArticles) => {
             const results = [];
             // Find all elements that represent an article container.
             // <--- REPLACE THIS SELECTOR with the actual article container selector
-            const articleElements = document.querySelectorAll('div.col-md-12 > div.row > div');
+            const articleElements = document.querySelectorAll('div#vantage-grid-loop > article.grid-post');
 
             if (articleElements.length === 0) {
-                console.warn("No article container elements found with the provided selector. Please check your selector.");
+                console.warn("No <article> elements found with the specified selectors. Please check your selectors and ensure content is loaded.");
                 return [];
             }
 
             for (let i = 0; i < Math.min(articleElements.length, maxArticles); i++) {
                 const articleElement = articleElements[i];
 
+
                 // Extract Title
                 // <--- REPLACE THIS SELECTOR
-                const titleElement = articleElement.querySelector('article h2');
+                const titleElement = articleElement.querySelector('h2 > a');
                 const title = titleElement ? titleElement.innerText.trim() : 'N/A';
 
                 // Extract Date
                 // <--- REPLACE THIS SELECTOR
-                const dateElement = articleElement.querySelector('article > p > time');
-                const date = dateElement ? dateElement.getAttribute('datetime') : 'N/A'
+                const dateElement = articleElement.querySelector('div.date');
+                const date = dateElement ? dateElement.innerText.trim() : 'N/A'
 
                 // Extract Link
                 // <--- REPLACE THIS SELECTOR
-                const linkElement = articleElement.querySelector('article a');
+                const linkElement = articleElement.querySelector('a');
                 // Use window.location.origin to ensure absolute URLs
                 const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
 
@@ -81,7 +87,7 @@ async function scrapeArticlesWithPuppeteer(url) {
         console.error("An error occurred during Puppeteer scraping:", error);
         return [];
     } finally {
-        // Ensure the browser is closed even if an error occurs
+
         if (browser) {
             await browser.close();
         }
@@ -91,7 +97,7 @@ async function scrapeArticlesWithPuppeteer(url) {
 
 // --- Configuration ---
 // <--- REPLACE THIS WITH THE ACTUAL URL OF THE WEBSITE YOU WANT TO SCRAPE
-const targetUrl = 'https://www.gob.mx/stps/archivo/prensa?idiom=es';
+const targetUrl = 'https://mma.gob.cl/category/noticias/';
 
 // --- Run the scraper ---
 scrapeArticlesWithPuppeteer(targetUrl)

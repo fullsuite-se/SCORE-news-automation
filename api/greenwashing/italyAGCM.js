@@ -60,15 +60,24 @@ export default async function handler(req, res) {
   const url = 'https://www.asic.gov.au/newsroom/search/?tag=sustainable%20finance';
 
   try {
-    const { puppeteer, launchOptions } = await getBrowserModules();
+    const { puppeteer, chromiumArgs, chromiumDefaultViewport, executablePath } = await getBrowserModules();
 
     console.log('--- Puppeteer Launch Information ---');
     console.log('Is Vercel Environment:', isVercelEnvironment);
-    console.log('Launch Options:', JSON.stringify(launchOptions, null, 2));
+    console.log('Executable Path:', executablePath);
+    console.log('Chromium Args:', chromiumArgs);
+    console.log('Chromium Default Viewport:', chromiumDefaultViewport);
     console.log('--- End Launch Info ---');
     
     console.log('Attempting to launch Puppeteer browser...');
-    browser = await puppeteer.launch(launchOptions);
+
+    // Correctly assemble the launch options object
+    browser = await puppeteer.launch({
+      args: chromiumArgs,
+      defaultViewport: chromiumDefaultViewport,
+      executablePath: executablePath,
+      headless: true // Or false for debugging
+    });
     const page = await browser.newPage();
 
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });

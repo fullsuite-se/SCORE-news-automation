@@ -60,14 +60,24 @@ async function main() {
   const url = 'https://www.asic.gov.au/newsroom/search/?tag=sustainable%20finance';
 
   try {
-    const { puppeteer: puppeteerToLaunch, launchOptions } = await getBrowserModules();
+    const { puppeteer, chromiumArgs, chromiumDefaultViewport, executablePath } = await getBrowserModules();
 
     console.log('--- Puppeteer Launch Information ---');
-    console.log('Launch Options:', JSON.stringify(launchOptions, null, 2));
+    console.log('Is Vercel Environment:', isVercelEnvironment);
+    console.log('Executable Path:', executablePath);
+    console.log('Chromium Args:', chromiumArgs);
+    console.log('Chromium Default Viewport:', chromiumDefaultViewport);
     console.log('--- End Launch Info ---');
     
     console.log('Attempting to launch Puppeteer browser...');
-    browser = await puppeteerToLaunch.launch(launchOptions);
+
+    // Correctly assemble the launch options object
+    browser = await puppeteer.launch({
+      args: chromiumArgs,
+      defaultViewport: chromiumDefaultViewport,
+      executablePath: executablePath,
+      headless: true // Or false for debugging
+    });
     const page = await browser.newPage();
 
     console.log(`Navigating to ASIC Newsroom search results: ${url}`);
