@@ -122,10 +122,10 @@ export default async function (req, res) {
                 // Use window.location.origin to ensure absolute URLs
                 const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
 
-                results.push({
+                 results.push({
                     title: title,
-                    date: date,
-                    link: link
+                    url: link,
+                    date: date
                 });
             }
             return results;

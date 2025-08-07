@@ -75,8 +75,8 @@ async function scrapeArticlesWithPuppeteer(url) {
 
                 results.push({
                     title: title,
-                    date: date,
-                    link: link
+                    url: link,
+                    date: date
                 });
             }
             return results;

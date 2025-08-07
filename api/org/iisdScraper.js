@@ -2,6 +2,7 @@
 const isVercelEnvironment = !!process.env.AWS_REGION;
 
 async function getBrowserModules() {
+  const puppeteer = (await import('puppeteer-core')).default;
   const { default: chromium } = await import('@sparticuz/chromium');
   const executablePath = await chromium.executablePath();
 

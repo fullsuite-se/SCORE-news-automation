@@ -130,10 +130,7 @@ export default async function handler(req, res) {
       });
     } else {
       console.log(`Found ${articles.length} articles.`);
-      return res.status(200).json({
-        success: true,
-        data: articles
-      });
+      return res.status(200).json(articles);
     }
   } catch (err) {
     console.error("Error during scraping:", err);

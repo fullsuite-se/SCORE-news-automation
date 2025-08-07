@@ -1,8 +1,9 @@
+
 const isVercelEnvironment = !!process.env.AWS_REGION;
 
 async function getBrowserModules() {
   if (isVercelEnvironment) {
-    const puppeteer = await import('puppeteer-core');
+    const puppeteer = (await import('puppeteer-core')).default;
     const { default: ChromiumClass } = await import('@sparticuz/chromium');
 
     console.log('--- Debugging ChromiumClass object (Vercel Environment) ---');
@@ -26,24 +27,19 @@ async function getBrowserModules() {
       executablePath: executablePathValue
     };
   } else {
-    const puppeteer = await import('puppeteer');
+    const puppeteer = (await import('puppeteer')).default;
     return {
       puppeteer,
-      chromiumArgs: ['--no-sandbox', '--disable-setuid-sandbox'],
+      chromiumArgs: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'], 
       chromiumDefaultViewport: null, 
       executablePath: undefined 
     };
   }
 }
 
-/**
- *
- * @param {object} req 
- * @param {object} res 
- */
 export default async function handler(req, res) {
   let browser; 
-  const url = 'https://web.iaiglobal.or.id/Berita-Kategori/SAK%20Update?page_berita=1#gsc.tab=0';
+  const url = 'https://www.gob.mx/stps/archivo/prensa?idiom=es';
 
   try {
     const { puppeteer, chromiumArgs, chromiumDefaultViewport, executablePath } = await getBrowserModules();
@@ -64,53 +60,67 @@ export default async function handler(req, res) {
 
     const launchOptions = isVercelEnvironment
       ? {
-          args: chromiumArgs,          
+          args: chromiumArgs,           
           defaultViewport: chromiumDefaultViewport, 
           executablePath: executablePath, 
-          headless: true,             
+          headless: true,               
         }
       : {
           headless: true,               
-          defaultViewport: null,       
-          args: ['--no-sandbox', '--disable-setuid-sandbox'], 
+          defaultViewport: null,        
+          args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'], 
         };
 
     console.log('Attempting to launch Puppeteer with options:', JSON.stringify(launchOptions, null, 2));
 
     browser = await puppeteer.launch(launchOptions);
     const page = await browser.newPage();
+    const articles = [];
+    const maxArticles = 10;
 
     console.log(`Navigating to ${url}...`);
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-    console.log('Waiting for articles selector (div.col-md-12)...');
-    await page.waitForSelector('div.col-md-12', { timeout: 15000 });
+    const scrapedData = await page.evaluate((maxArticles) => {
+            const results = [];
+            // Find all elements that represent an article container.
+            // <--- REPLACE THIS SELECTOR with the actual article container selector
+            const articleElements = document.querySelectorAll('div.col-md-12 > div.row > div');
 
-    console.log('Scraping articles...');
-    const articles = await page.evaluate(() => {
-      const containers = Array.from(document.querySelectorAll('div.col-md-12'));
-      const results = [];
+            if (articleElements.length === 0) {
+                console.warn("No article container elements found with the provided selector. Please check your selector.");
+                return [];
+            }
 
-      containers.forEach(container => {
-        const linkEl = container.querySelector('p a');
-        const titleEl = container.querySelector('h3');
-        const dateEl = container.querySelector('p.posted_on.mb-2');
+            for (let i = 0; i < Math.min(articleElements.length, maxArticles); i++) {
+                const articleElement = articleElements[i];
 
-        const title = titleEl ? titleEl.textContent.trim() : null;
-        const url = linkEl ? linkEl.href : null;
-        let date = dateEl ? dateEl.textContent.trim() : null;
+                // Extract Title
+                // <--- REPLACE THIS SELECTOR
+                const titleElement = articleElement.querySelector('article h2');
+                const title = titleElement ? titleElement.innerText.trim() : 'N/A';
 
-        if (date && date.includes('- SAK Update')) {
-          date = date.replace('- SAK Update', '').trim();
-        }
+                // Extract Date
+                // <--- REPLACE THIS SELECTOR
+                const dateElement = articleElement.querySelector('article > p > time');
+                const date = dateElement ? dateElement.getAttribute('datetime') : 'N/A'
 
-        if (title && url) {
-          results.push({ title, url, date });
-        }
-      });
-      console.log(`Found ${results.length} articles on the page.`); 
-      return results;
-    });
+                // Extract Link
+                // <--- REPLACE THIS SELECTOR
+                const linkElement = articleElement.querySelector('article a');
+                // Use window.location.origin to ensure absolute URLs
+                const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
+
+                results.push({
+                    title: title,
+                    url: link,
+                    date: date,
+                });
+            }
+            return results;
+        }, maxArticles); // Pass maxArticles to the page.evaluate context
+
+        articles.push(...scrapedData);
 
     if (articles.length === 0) {
       console.log('No articles found.');
@@ -125,7 +135,6 @@ export default async function handler(req, res) {
   } catch (err) {
     console.error('Error during scraping:', err);
     return res.status(500).json({
-      error: 'Scraping failed',
       details: err.message || 'An unknown error occurred during scraping.'
     });
   } finally {

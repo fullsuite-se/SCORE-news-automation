@@ -30,7 +30,7 @@ async function scrapeArticlesWithPuppeteer(url) {
             const results = [];
             // Find all elements that represent an article container.
             // <--- REPLACE THIS SELECTOR with the actual article container selector
-            const articleElements = document.querySelectorAll('table[summary="Latest Statements List "] tbody tr');
+            const articleElements = document.querySelectorAll('div.col-md-12 > div.row > div');
 
             if (articleElements.length === 0) {
                 console.warn("No article container elements found with the provided selector. Please check your selector.");
@@ -42,24 +42,24 @@ async function scrapeArticlesWithPuppeteer(url) {
 
                 // Extract Title
                 // <--- REPLACE THIS SELECTOR
-                const titleElement = articleElement.querySelector('td:nth-child(2) a');
+                const titleElement = articleElement.querySelector('article h2');
                 const title = titleElement ? titleElement.innerText.trim() : 'N/A';
 
                 // Extract Date
                 // <--- REPLACE THIS SELECTOR
-                const dateElement = articleElement.querySelector('td:nth-child(3)');
-                const date = dateElement ? dateElement.innerText.trim() : 'N/A';
+                const dateElement = articleElement.querySelector('article > p > time');
+                const date = dateElement ? dateElement.getAttribute('datetime') : 'N/A'
 
                 // Extract Link
                 // <--- REPLACE THIS SELECTOR
-                const linkElement = articleElement.querySelector('td:nth-child(2) a');
+                const linkElement = articleElement.querySelector('article a');
                 // Use window.location.origin to ensure absolute URLs
                 const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
 
                 results.push({
                     title: title,
+                    url: link,
                     date: date,
-                    link: link
                 });
             }
             return results;
@@ -91,7 +91,7 @@ async function scrapeArticlesWithPuppeteer(url) {
 
 // --- Configuration ---
 // <--- REPLACE THIS WITH THE ACTUAL URL OF THE WEBSITE YOU WANT TO SCRAPE
-const targetUrl = 'https://www.labour.gov.za/Media-Desk/Media-Statements/Pages/media-statements.aspx';
+const targetUrl = 'https://www.gob.mx/stps/archivo/prensa?idiom=es';
 
 // --- Run the scraper ---
 scrapeArticlesWithPuppeteer(targetUrl)
