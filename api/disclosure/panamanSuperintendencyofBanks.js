@@ -43,12 +43,20 @@ export default async function handler(req, res) {
   try {
     const { puppeteer, chromiumArgs, chromiumDefaultViewport, executablePath } = await getBrowserModules();
 
-    const launchOptions = {
+    const launchOptions = isVercelEnvironment
+    ? {
         args: chromiumArgs,
         defaultViewport: chromiumDefaultViewport,
         executablePath: executablePath,
-        headless: 'new' // It's a good practice to specify the headless mode
-    };
+        headless: "new", // Must be true for serverless environments
+      }
+    : {
+        headless: "new", // Set to true for consistency, or false for local visual debugging
+        defaultViewport: null,
+        slowMo: 50,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
+        executablePath: executablePath,
+      };
 
     console.log('--- Puppeteer Launch Information ---');
     console.log('Is Vercel Environment:', isVercelEnvironment);

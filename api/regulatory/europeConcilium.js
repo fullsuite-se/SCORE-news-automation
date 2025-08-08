@@ -84,7 +84,7 @@ export default async function (req, res) {
       };
   let browser;
 
-  const url = `https://www.labour.gov.za/Media-Desk/Media-Statements/Pages/media-statements.aspx`
+  const url = `https://www.consilium.europa.eu/en/press/press-releases/?keyword=&DateFrom=&DateTo=&Topic=122254&Topic=122124&Topic=122161&Topic=122178`
   const articles = [];
   const maxArticles = 10;
   try {
@@ -94,6 +94,38 @@ export default async function (req, res) {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
    
     //**REPLACE STARTING HERE**
+
+    const acceptButtonSelector = 'button.gsc-btn.gsc-btn--confirm'; // Example: A button with ID 'accept-cookies'
+        const cookieBannerSelector = 'section.gsc-cookie-section'; // Example: The banner div itself
+
+        console.log("DIAGNOSTIC (Outer): Checking for cookie consent banner...");
+        try {
+            await page.waitForSelector(acceptButtonSelector, { visible: true, timeout: 5000 });
+            console.log("DIAGNOSTIC (Outer): Cookie accept button found. Attempting to click...");
+
+            await page.evaluate((selector) => {
+                const button = document.querySelector(selector);
+                if (button) {
+                    button.click();
+                } else {
+                    throw new Error(`Button with selector ${selector} not found in page.evaluate.`);
+                }
+            }, acceptButtonSelector);
+
+            console.log("DIAGNOSTIC (Outer): Cookie accept button clicked (via evaluate).");
+
+            await page.waitForSelector(cookieBannerSelector, { hidden: true, timeout: 5000 });
+            console.log("DIAGNOSTIC (Outer): Cookie banner disappeared.");
+
+            // Optional: Reload page after cookie acceptance for a clean state
+            console.log("DIAGNOSTIC (Outer): Reloading page after cookie acceptance...");
+            await page.reload({ waitUntil: 'networkidle0' });
+            console.log("DIAGNOSTIC (Outer): Page reloaded.");
+
+
+        } catch (cookieError) {
+            console.warn(`DIAGNOSTIC (Outer): No cookie banner/accept button found or it timed out, or click failed. Proceeding without explicit cookie acceptance. Error: ${cookieError.message}`);
+        }
     
     const dateGroupingItemSelector = 'ul.gsc-excerpt-list > li.gsc-excerpt-list__item';
     const minExpectedDateGroups = 1; // At least one date group should be present
@@ -101,7 +133,7 @@ export default async function (req, res) {
     console.log(`DIAGNOSTIC (Outer): Waiting for at least ${minExpectedDateGroups} date grouping items to be present using waitForFunction...`);
     await page.waitForFunction(
       (selector, minCount) => document.querySelectorAll(selector).length >= minCount,
-      { timeout: 60000 }, // Max wait time
+      { timeout: 30000 }, // Max wait time
       dateGroupingItemSelector,
       minExpectedDateGroups
     );

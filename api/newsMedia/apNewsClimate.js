@@ -67,12 +67,23 @@ export default async function (req, res) {
     console.log('--- End Launch Info ---');
 
     console.log('Attempting to launch browser...');
-    browser = await puppeteer.launch({
-      args: chromiumArgs,
-      defaultViewport: chromiumDefaultViewport,
-      executablePath: executablePath,
-      headless: true // Or false for debugging
-    });
+    const launchOptions = isVercelEnvironment
+    ? {
+        args: chromiumArgs,
+        defaultViewport: chromiumDefaultViewport,
+        executablePath: executablePath,
+        headless: "new", // Must be true for serverless environments
+      }
+    : {
+        headless: "new", // Set to true for consistency, or false for local visual debugging
+        defaultViewport: null,
+        slowMo: 50,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
+        executablePath: executablePath,
+      };
+    
+    
+    browser = await puppeteer.launch(launchOptions);
     const mainPage = await browser.newPage();
 
     console.log(`Navigating to main page: ${mainUrl}...`);

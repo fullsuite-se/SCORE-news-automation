@@ -27,8 +27,8 @@ async function scrapeArticlesWithPuppeteer(url) {
         // Use page.evaluate() to run JavaScript code within the context of the browser page.
         // This is where you'll use the DOM manipulation logic similar to the client-side script.
 
-       const acceptButtonSelector = 'button.agree-button'; // Example: A button with ID 'accept-cookies'
-        const cookieBannerSelector = 'div.eu-cookie-compliance-banner'; // Example: The banner div itself
+       const acceptButtonSelector = 'button.gsc-btn.gsc-btn--confirm'; // Example: A button with ID 'accept-cookies'
+        const cookieBannerSelector = 'section.gsc-cookie-section'; // Example: The banner div itself
 
         console.log("DIAGNOSTIC (Outer): Checking for cookie consent banner...");
         try {
