@@ -29,8 +29,7 @@ export default async function (req, res) {
   console.log('--- End Debug Info ---');
   
   let browser;
-  const baseUrl = 'https://enb.iisd.org/archives';
-  const url = `${baseUrl}/archives`;
+  const url = `https://enb.iisd.org/archives`;
 
   try {
     console.log('Attempting to launch Puppeteer...');

@@ -60,14 +60,19 @@ export default async function (req, res) {
   const mainUrl = 'https://apnews.com/climate-and-environment';
 
   try {
-    const { puppeteer, launchOptions } = await getBrowserModules();
+    const { puppeteer, chromiumArgs, chromiumDefaultViewport, executablePath } = await getBrowserModules();
 
     console.log('--- Puppeteer Launch Info ---');
     console.log('Launch Options:', JSON.stringify(launchOptions, null, 2));
     console.log('--- End Launch Info ---');
 
     console.log('Attempting to launch browser...');
-    browser = await puppeteer.launch(launchOptions);
+    browser = await puppeteer.launch({
+      args: chromiumArgs,
+      defaultViewport: chromiumDefaultViewport,
+      executablePath: executablePath,
+      headless: true // Or false for debugging
+    });
     const mainPage = await browser.newPage();
 
     console.log(`Navigating to main page: ${mainUrl}...`);

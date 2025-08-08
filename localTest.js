@@ -12,7 +12,7 @@ async function scrapeArticlesWithPuppeteer(url) {
         // Launch a headless browser instance.
         // `headless: true` runs Chrome without a visible UI.
         // Set to `headless: false` if you want to see the browser automation.
-        browser = await puppeteer.launch({ headless: true });
+        browser = await puppeteer.launch({ headless: false });
         const page = await browser.newPage();
 
         // Set a default timeout for navigation (e.g., 60 seconds)
@@ -27,8 +27,8 @@ async function scrapeArticlesWithPuppeteer(url) {
         // Use page.evaluate() to run JavaScript code within the context of the browser page.
         // This is where you'll use the DOM manipulation logic similar to the client-side script.
 
-       const acceptButtonSelector = 'button.gsc-btn.gsc-btn--confirm'; // Example: A button with ID 'accept-cookies'
-        const cookieBannerSelector = 'section.gsc-cookie-selection'; // Example: The banner div itself
+       const acceptButtonSelector = 'button.agree-button'; // Example: A button with ID 'accept-cookies'
+        const cookieBannerSelector = 'div.eu-cookie-compliance-banner'; // Example: The banner div itself
 
         console.log("DIAGNOSTIC (Outer): Checking for cookie consent banner...");
         try {
@@ -68,7 +68,7 @@ async function scrapeArticlesWithPuppeteer(url) {
             const results = [];
             // Find all elements that represent an article container.
             // <--- REPLACE THIS SELECTOR with the actual article container selector
-            const articleElements = document.querySelectorAll('ul.gsc-excerpt-list > li.gsc-excerpt__item');
+            const articleElements = document.querySelectorAll('c-listing__items > div.views-row');
 
             if (articleElements.length === 0) {
                 console.warn("DIAGNOSTIC (Inner): No <article> elements found with the specified main selector ('.view-content > div.views-row > article').");
@@ -84,17 +84,17 @@ async function scrapeArticlesWithPuppeteer(url) {
 
                 // Extract Title
                 // <--- REPLACE THIS SELECTOR
-                const titleElement = articleElement.querySelector('h3.node-title');
+                const titleElement = articleElement.querySelector('article > h3 > a');
                 const title = titleElement ? titleElement.innerText.trim() : 'N/A';
 
                 // Extract Date
                 // <--- REPLACE THIS SELECTOR
-                const dateElement = articleElement.querySelector('h2');
+                const dateElement = articleElement.querySelector('article > small > span.c-list-item__meta-date');
                 const date = dateElement ? dateElement.innerText.trim() : 'N/A'
 
                 // Extract Link
                 // <--- REPLACE THIS SELECTOR
-                const linkElement = articleElement.querySelector('article .node__content .group h3 a');
+                const linkElement = articleElement.querySelector('article > h3 > a');
                 // Use window.location.origin to ensure absolute URLs
                 const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
 
@@ -126,7 +126,7 @@ async function scrapeArticlesWithPuppeteer(url) {
         return [];
     } finally {
         if (browser) {
-            await browser.close();
+            //await browser.close();
         }
         console.log("Browser closed.");
     }
@@ -134,7 +134,7 @@ async function scrapeArticlesWithPuppeteer(url) {
 
 // --- Configuration ---
 // <--- REPLACE THIS WITH THE ACTUAL URL OF THE WEBSITE YOU WANT TO SCRAPE
-const targetUrl = 'https://www.consilium.europa.eu/en/press/press-releases/?keyword=&DateFrom=&DateTo=&Topic=122254&Topic=122124&Topic=122161&Topic=122178';
+const targetUrl = 'https://enb.iisd.org/archives';
 
 // --- Run the scraper ---
 scrapeArticlesWithPuppeteer(targetUrl)

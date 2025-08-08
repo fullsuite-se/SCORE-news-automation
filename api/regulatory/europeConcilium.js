@@ -101,7 +101,7 @@ export default async function (req, res) {
     console.log(`DIAGNOSTIC (Outer): Waiting for at least ${minExpectedDateGroups} date grouping items to be present using waitForFunction...`);
     await page.waitForFunction(
       (selector, minCount) => document.querySelectorAll(selector).length >= minCount,
-      { timeout: 30000 }, // Max wait time
+      { timeout: 60000 }, // Max wait time
       dateGroupingItemSelector,
       minExpectedDateGroups
     );

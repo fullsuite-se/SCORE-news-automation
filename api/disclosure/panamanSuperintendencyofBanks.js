@@ -41,7 +41,14 @@ export default async function handler(req, res) {
   const url = 'https://www.superbancos.gob.pa/en/search/node?keys=ISSB';
 
   try {
-    const { puppeteer, launchOptions } = await getBrowserModules();
+    const { puppeteer, chromiumArgs, chromiumDefaultViewport, executablePath } = await getBrowserModules();
+
+    const launchOptions = {
+        args: chromiumArgs,
+        defaultViewport: chromiumDefaultViewport,
+        executablePath: executablePath,
+        headless: 'new' // It's a good practice to specify the headless mode
+    };
 
     console.log('--- Puppeteer Launch Information ---');
     console.log('Is Vercel Environment:', isVercelEnvironment);

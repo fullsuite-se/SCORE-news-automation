@@ -60,7 +60,7 @@ export default async function handler(req, res) {
   const url = 'https://en.agcm.it/en/media/press-releases/';
 
   try {
-    const { puppeteer, launchOptions } = await getBrowserModules();
+    const { puppeteer, chromiumArgs, chromiumDefaultViewport, executablePath } = await getBrowserModules();
 
     console.log('--- Puppeteer Launch Information ---');
     console.log('Is Vercel Environment:', isVercelEnvironment);
@@ -68,7 +68,12 @@ export default async function handler(req, res) {
     console.log('--- End Launch Info ---');
     
     console.log('Attempting to launch Puppeteer browser...');
-    browser = await puppeteer.launch(launchOptions);
+    browser = await puppeteer.launch({
+      args: chromiumArgs,
+      defaultViewport: chromiumDefaultViewport,
+      executablePath: executablePath,
+      headless: true // Or false for debugging
+    });
     const page = await browser.newPage();
 
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });

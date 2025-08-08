@@ -32,10 +32,13 @@ async function getBrowserModules() {
   const recaptchaPluginModule = await import('puppeteer-extra-plugin-recaptcha');
   const RecaptchaPlugin = recaptchaPluginModule.default;
 
+  let puppeteerInstance;
+  let launchOptions;
+
   if (isVercelEnvironment) {
     const { default: Chromium } = await import('@sparticuz/chromium');
     
-    puppeteerInstance = StealthPlugin;
+    puppeteerInstance = puppeteer;
     // Apply the stealth plugin to the puppeteer-core instance
     puppeteerInstance.use(StealthPlugin());
 
