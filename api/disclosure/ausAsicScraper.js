@@ -4,8 +4,15 @@ async function getBrowserModules() {
   if (isVercelEnvironment) {
     const puppeteer = (await import('puppeteer-core')).default;
     const { default: ChromiumClass } = await import('@sparticuz/chromium');
-    
-    const executablePathValue = null;
+
+    console.log('--- Debugging ChromiumClass object (Vercel Environment) ---');
+    console.log('Type of ChromiumClass:', typeof ChromiumClass);
+    console.log('ChromiumClass.executablePath is a function:', typeof ChromiumClass.executablePath === 'function');
+    console.log('ChromiumClass.args:', ChromiumClass.args);
+    console.log('ChromiumClass.defaultViewport:', ChromiumClass.defaultViewport);
+    console.log('--- End ChromiumClass Debug (Vercel Environment) ---');
+
+    let executablePathValue = null;
     if (typeof ChromiumClass.executablePath === 'function') {
       executablePathValue = await ChromiumClass.executablePath();
     } else {

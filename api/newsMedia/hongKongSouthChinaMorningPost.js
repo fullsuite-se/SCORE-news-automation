@@ -7,31 +7,39 @@ const isVercelEnvironment = !!process.env.AWS_REGION; // Or check for process.en
  * @returns {Promise<{puppeteer: object, chromiumArgs: string[], chromiumDefaultViewport: object, executablePath: string|null}>}
  */
 async function getBrowserModules() {
-  const puppeteer = await import('puppeteer-core');
-  const { default: ChromiumClass } = await import('@sparticuz/chromium');
+  if (isVercelEnvironment) {
+    const puppeteer = (await import('puppeteer-core')).default;
+    const { default: ChromiumClass } = await import('@sparticuz/chromium');
 
-  console.log('--- Debugging ChromiumClass object (Vercel) ---');
-  console.log('Type of ChromiumClass:', typeof ChromiumClass);
-  console.log('Keys of ChromiumClass:', Object.keys(ChromiumClass));
-  console.log('Full ChromiumClass object:', ChromiumClass);
-  console.log('ChromiumClass.executablePath is a function:', typeof ChromiumClass.executablePath === 'function');
-  console.log('ChromiumClass.args:', ChromiumClass.args);
-  console.log('ChromiumClass.defaultViewport:', ChromiumClass.defaultViewport);
-  console.log('--- End ChromiumClass Debug (Vercel) ---');
+    console.log('--- Debugging ChromiumClass object (Vercel Environment) ---');
+    console.log('Type of ChromiumClass:', typeof ChromiumClass);
+    console.log('ChromiumClass.executablePath is a function:', typeof ChromiumClass.executablePath === 'function');
+    console.log('ChromiumClass.args:', ChromiumClass.args);
+    console.log('ChromiumClass.defaultViewport:', ChromiumClass.defaultViewport);
+    console.log('--- End ChromiumClass Debug (Vercel Environment) ---');
 
-  let executablePathValue = null;
-  if (typeof ChromiumClass.executablePath === 'function') {
-    executablePathValue = await ChromiumClass.executablePath();
+    let executablePathValue = null;
+    if (typeof ChromiumClass.executablePath === 'function') {
+      executablePathValue = await ChromiumClass.executablePath();
+    } else {
+      executablePathValue = ChromiumClass.executablePath;
+    }
+
+    return {
+      puppeteer,
+      chromiumArgs: ChromiumClass.args,
+      chromiumDefaultViewport: ChromiumClass.defaultViewport,
+      executablePath: executablePathValue
+    };
   } else {
-    executablePathValue = ChromiumClass.executablePath;
+    const puppeteer = (await import('puppeteer')).default;
+    return {
+      puppeteer,
+      chromiumArgs: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'], 
+      chromiumDefaultViewport: null, 
+      executablePath: undefined 
+    };
   }
-
-  return {
-    puppeteer,
-    chromiumArgs: ChromiumClass.args,
-    chromiumDefaultViewport: ChromiumClass.defaultViewport,
-    executablePath: executablePathValue
-  };
 }
 
 /**

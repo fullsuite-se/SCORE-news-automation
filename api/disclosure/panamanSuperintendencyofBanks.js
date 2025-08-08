@@ -1,48 +1,39 @@
 const isVercelEnvironment = !!process.env.AWS_REGION;
 
 async function getBrowserModules() {
-  let puppeteerInstance;
-  let launchOptions;
+    if (isVercelEnvironment) {
+    const puppeteer = (await import('puppeteer-core')).default;
+    const { default: ChromiumClass } = await import('@sparticuz/chromium');
 
-  const stealthPluginModule = await import('puppeteer-extra-plugin-stealth');
-  const stealthPlugin = stealthPluginModule.default;
+    console.log('--- Debugging ChromiumClass object (Vercel Environment) ---');
+    console.log('Type of ChromiumClass:', typeof ChromiumClass);
+    console.log('ChromiumClass.executablePath is a function:', typeof ChromiumClass.executablePath === 'function');
+    console.log('ChromiumClass.args:', ChromiumClass.args);
+    console.log('ChromiumClass.defaultViewport:', ChromiumClass.defaultViewport);
+    console.log('--- End ChromiumClass Debug (Vercel Environment) ---');
 
-  if (isVercelEnvironment) {
-    const puppeteerCoreModule = await import('puppeteer-core');
-    const { default: Chromium } = await import('@sparticuz/chromium');
-    
-    puppeteerInstance = puppeteerCoreModule;
-    puppeteerInstance.use(stealthPlugin());
-
-    const executablePath = await Chromium.executablePath();
-    if (!executablePath) {
-      throw new Error('Chromium executable path not found on Vercel.');
+    let executablePathValue = null;
+    if (typeof ChromiumClass.executablePath === 'function') {
+      executablePathValue = await ChromiumClass.executablePath();
+    } else {
+      executablePathValue = ChromiumClass.executablePath;
     }
-    
-    launchOptions = {
-      args: Chromium.args,
-      defaultViewport: Chromium.defaultViewport,
-      executablePath: executablePath,
-      headless: 'new',
+
+    return {
+      puppeteer,
+      chromiumArgs: ChromiumClass.args,
+      chromiumDefaultViewport: ChromiumClass.defaultViewport,
+      executablePath: executablePathValue
     };
   } else {
-    const puppeteerExtraModule = await import('puppeteer-extra');
-    puppeteerInstance = puppeteerExtraModule.default;
-    puppeteerInstance.use(stealthPlugin());
-
-    launchOptions = {
-      headless: 'new',
-      slowMo: 50,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-gpu',
-        '--disable-dev-shm-usage',
-      ],
+    const puppeteer = (await import('puppeteer')).default;
+    return {
+      puppeteer,
+      chromiumArgs: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'], 
+      chromiumDefaultViewport: null, 
+      executablePath: undefined 
     };
   }
-
-  return { puppeteer: puppeteerInstance, launchOptions };
 }
 
 export default async function handler(req, res) {

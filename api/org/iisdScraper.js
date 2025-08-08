@@ -29,7 +29,7 @@ export default async function (req, res) {
   console.log('--- End Debug Info ---');
   
   let browser;
-  const baseUrl = 'https://enb.iisd.org';
+  const baseUrl = 'https://enb.iisd.org/archives';
   const url = `${baseUrl}/archives`;
 
   try {

@@ -27,19 +27,55 @@ async function scrapeArticlesWithPuppeteer(url) {
         // Use page.evaluate() to run JavaScript code within the context of the browser page.
         // This is where you'll use the DOM manipulation logic similar to the client-side script.
 
-    
-        // await page.waitForSelector('div#content-core', { timeout: 10000 });
+       const acceptButtonSelector = 'button.gsc-btn.gsc-btn--confirm'; // Example: A button with ID 'accept-cookies'
+        const cookieBannerSelector = 'section.gsc-cookie-selection'; // Example: The banner div itself
+
+        console.log("DIAGNOSTIC (Outer): Checking for cookie consent banner...");
+        try {
+            await page.waitForSelector(acceptButtonSelector, { visible: true, timeout: 5000 });
+            console.log("DIAGNOSTIC (Outer): Cookie accept button found. Attempting to click...");
+
+            await page.evaluate((selector) => {
+                const button = document.querySelector(selector);
+                if (button) {
+                    button.click();
+                } else {
+                    throw new Error(`Button with selector ${selector} not found in page.evaluate.`);
+                }
+            }, acceptButtonSelector);
+
+            console.log("DIAGNOSTIC (Outer): Cookie accept button clicked (via evaluate).");
+
+            await page.waitForSelector(cookieBannerSelector, { hidden: true, timeout: 5000 });
+            console.log("DIAGNOSTIC (Outer): Cookie banner disappeared.");
+
+            // Optional: Reload page after cookie acceptance for a clean state
+            console.log("DIAGNOSTIC (Outer): Reloading page after cookie acceptance...");
+            await page.reload({ waitUntil: 'networkidle0' });
+            console.log("DIAGNOSTIC (Outer): Page reloaded.");
 
 
-        const scrapedData = await page.evaluate((maxArticles) => {
+        } catch (cookieError) {
+            console.warn(`DIAGNOSTIC (Outer): No cookie banner/accept button found or it timed out, or click failed. Proceeding without explicit cookie acceptance. Error: ${cookieError.message}`);
+        }
+
+       console.log("DIAGNOSTIC (Outer): Waiting for 'ul.gsc-excerpt-list' to appear...");
+        await page.waitForSelector('ul.gsc-excerpt-list', { timeout: 10000 });
+        console.log("DIAGNOSTIC (Outer): 'ul.gsc-excerpt-list' found.");
+
+        // --- NEW ROBUST WAITING STRATEGY: Wait for a minimum number of date-grouping list items ---
+       const scrapedData = await page.evaluate((maxArticles) => {
             const results = [];
             // Find all elements that represent an article container.
             // <--- REPLACE THIS SELECTOR with the actual article container selector
-            const articleElements = document.querySelectorAll('div#vantage-grid-loop > article.grid-post');
+            const articleElements = document.querySelectorAll('ul.gsc-excerpt-list > li.gsc-excerpt__item');
 
             if (articleElements.length === 0) {
-                console.warn("No <article> elements found with the specified selectors. Please check your selectors and ensure content is loaded.");
+                console.warn("DIAGNOSTIC (Inner): No <article> elements found with the specified main selector ('.view-content > div.views-row > article').");
+                console.warn("DIAGNOSTIC (Inner): Please ensure this selector is correct and the content is loaded on the page.");
                 return [];
+            } else {
+                console.log(`DIAGNOSTIC (Inner): Found ${articleElements.length} potential article elements.`);
             }
 
             for (let i = 0; i < Math.min(articleElements.length, maxArticles); i++) {
@@ -48,17 +84,17 @@ async function scrapeArticlesWithPuppeteer(url) {
 
                 // Extract Title
                 // <--- REPLACE THIS SELECTOR
-                const titleElement = articleElement.querySelector('h2 > a');
+                const titleElement = articleElement.querySelector('h3.node-title');
                 const title = titleElement ? titleElement.innerText.trim() : 'N/A';
 
                 // Extract Date
                 // <--- REPLACE THIS SELECTOR
-                const dateElement = articleElement.querySelector('div.date');
+                const dateElement = articleElement.querySelector('h2');
                 const date = dateElement ? dateElement.innerText.trim() : 'N/A'
 
                 // Extract Link
                 // <--- REPLACE THIS SELECTOR
-                const linkElement = articleElement.querySelector('a');
+                const linkElement = articleElement.querySelector('article .node__content .group h3 a');
                 // Use window.location.origin to ensure absolute URLs
                 const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
 
@@ -72,6 +108,8 @@ async function scrapeArticlesWithPuppeteer(url) {
         }, maxArticles); // Pass maxArticles to the page.evaluate context
 
         articles.push(...scrapedData);
+
+        console.log("DIAGNOSTIC (Outer): Article data extraction finished.");
 
         console.log(`Successfully scraped ${articles.length} articles:`);
         console.table(articles);
@@ -87,7 +125,6 @@ async function scrapeArticlesWithPuppeteer(url) {
         console.error("An error occurred during Puppeteer scraping:", error);
         return [];
     } finally {
-
         if (browser) {
             await browser.close();
         }
@@ -97,7 +134,7 @@ async function scrapeArticlesWithPuppeteer(url) {
 
 // --- Configuration ---
 // <--- REPLACE THIS WITH THE ACTUAL URL OF THE WEBSITE YOU WANT TO SCRAPE
-const targetUrl = 'https://mma.gob.cl/category/noticias/';
+const targetUrl = 'https://www.consilium.europa.eu/en/press/press-releases/?keyword=&DateFrom=&DateTo=&Topic=122254&Topic=122124&Topic=122161&Topic=122178';
 
 // --- Run the scraper ---
 scrapeArticlesWithPuppeteer(targetUrl)
