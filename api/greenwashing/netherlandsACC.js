@@ -62,12 +62,7 @@ export default async function handler(req, res) {
 
   try {
     const { puppeteer, chromiumArgs, chromiumDefaultViewport, executablePath } = await getBrowserModules();
-
-    console.log('--- Puppeteer Launch Information ---');
-    console.log('Is Vercel Environment:', isVercelEnvironment);
-    console.log('Launch Options:', JSON.stringify(launchOptions, null, 2));
-    console.log('--- End Launch Info ---');
-    
+ 
     console.log('Attempting to launch Puppeteer browser...');
     const launchOptions = isVercelEnvironment
     ? {
@@ -83,7 +78,12 @@ export default async function handler(req, res) {
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
         executablePath: executablePath,
       };
-      
+
+    console.log('--- Puppeteer Launch Information ---');
+    console.log('Is Vercel Environment:', isVercelEnvironment);
+    console.log('Launch Options:', JSON.stringify(launchOptions, null, 2));
+    console.log('--- End Launch Info ---');  
+    
     browser = await puppeteer.launch(launchOptions);
     const page = await browser.newPage();
 

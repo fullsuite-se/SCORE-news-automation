@@ -62,10 +62,6 @@ export default async function (req, res) {
   try {
     const { puppeteer, chromiumArgs, chromiumDefaultViewport, executablePath } = await getBrowserModules();
 
-    console.log('--- Puppeteer Launch Info ---');
-    console.log('Launch Options:', JSON.stringify(launchOptions, null, 2));
-    console.log('--- End Launch Info ---');
-
     console.log('Attempting to launch browser...');
     const launchOptions = isVercelEnvironment
     ? {
@@ -82,6 +78,9 @@ export default async function (req, res) {
         executablePath: executablePath,
       };
     
+    console.log('--- Puppeteer Launch Info ---');
+    console.log('Launch Options:', JSON.stringify(launchOptions, null, 2));
+    console.log('--- End Launch Info ---');
     
     browser = await puppeteer.launch(launchOptions);
     const mainPage = await browser.newPage();
