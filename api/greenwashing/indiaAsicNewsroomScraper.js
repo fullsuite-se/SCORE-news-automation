@@ -1,104 +1,73 @@
 const isVercelEnvironment = !!process.env.AWS_REGION;
 
 async function getBrowserModules() {
-  await import('puppeteer-extra-plugin-stealth/evasions/chrome.app/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/chrome.csi/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/chrome.loadTimes/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/chrome.runtime/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/defaultArgs/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/iframe.contentWindow/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/media.codecs/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/navigator.hardwareConcurrency/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/navigator.languages/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/navigator.permissions/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/navigator.plugins/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/navigator.vendor/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/navigator.webdriver/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/sourceurl/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/user-agent-override/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/webgl.vendor/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/window.outerdimensions/index.js');
+  const puppeteerExtraModule = await import('puppeteer-extra');
+  const puppeteerExtra = puppeteerExtraModule.default;
 
-  const puppeteer = (await import('puppeteer-extra')).default;
-  // stealth plugin to hide puppeteer
-  const StealthPlugin = (await import('puppeteer-extra-plugin-stealth')).default;
-  puppeteer.use(StealthPlugin());
-
-  const UserPreferencesPlugin = (await import('puppeteer-extra-plugin-user-preferences')).default;
-  puppeteer.use(UserPreferencesPlugin());
-  const UserDataDirPlugin = (await import('puppeteer-extra-plugin-user-data-dir')).default;
-  puppeteer.use(UserDataDirPlugin());
+  const stealthPluginModule = await import('puppeteer-extra-plugin-stealth');
+  const stealthPlugin = stealthPluginModule.default;
   
-  const { default: ChromiumClass } = await import('@sparticuz/chromium');
-  console.log('--- Debugging ChromiumClass object (Vercel) ---');
-  console.log('Type of ChromiumClass:', typeof ChromiumClass);
-  console.log('Keys of ChromiumClass:', Object.keys(ChromiumClass));
-  console.log('Full ChromiumClass object:', ChromiumClass);
-  console.log('ChromiumClass.executablePath is a function:', typeof ChromiumClass.executablePath === 'function');
-  console.log('ChromiumClass.args:', ChromiumClass.args);
-  console.log('ChromiumClass.defaultViewport:', ChromiumClass.defaultViewport);
-  console.log('--- End ChromiumClass Debug (Vercel) ---');
-  let executablePathValue = null;
-  if (typeof ChromiumClass.executablePath === 'function') {
-    executablePathValue = await ChromiumClass.executablePath();
-    // executablePathValue = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+  puppeteerExtra.use(stealthPlugin());
+
+  if (isVercelEnvironment) {
+    const { default: ChromiumClass } = await import('@sparticuz/chromium');
+    
+    const executablePathValue = await ChromiumClass.executablePath();
+    
+    return {
+      puppeteer: puppeteerExtra,
+      launchOptions: {
+        args: ChromiumClass.args,
+        defaultViewport: ChromiumClass.defaultViewport,
+        executablePath: executablePathValue,
+        headless: 'new',
+      }
+    };
   } else {
-    executablePathValue = ChromiumClass.executablePath;
-    // executablePathValue = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+    return {
+      puppeteer: puppeteerExtra,
+      launchOptions: {
+        headless: 'new',
+        slowMo: 50,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-gpu',
+          '--disable-dev-shm-usage',
+        ],
+      }
+    };
   }
-  console.log('EXECUTABLE PATH VALUE: ', executablePathValue);
-  return {
-    puppeteer,
-    chromiumArgs: ChromiumClass.args,
-    chromiumDefaultViewport: ChromiumClass.defaultViewport,
-    executablePath: executablePathValue
-  };
 }
 
-/**
- * @param {object} req - The Vercel request object.
- * @param {object} res - The Vercel response object.
- */
 export default async function handler(req, res) {
   let browser;
   const url = 'https://www.ascionline.in/complaint-outcomes/';
 
   try {
-    const { puppeteer, chromiumArgs, chromiumDefaultViewport, executablePath } = await getBrowserModules();
+    const { puppeteer, launchOptions } = await getBrowserModules();
 
     console.log('--- Puppeteer Launch Information ---');
     console.log('Is Vercel Environment:', isVercelEnvironment);
-    console.log('Executable Path:', executablePath);
-    console.log('Chromium Args:', chromiumArgs);
-    console.log('Chromium Default Viewport:', chromiumDefaultViewport);
+    console.log('Launch Options:', JSON.stringify(launchOptions, null, 2));
     console.log('--- End Launch Info ---');
     
     console.log('Attempting to launch Puppeteer browser...');
-
-    // Correctly assemble the launch options object
-    browser = await puppeteer.launch({
-      args: chromiumArgs,
-      defaultViewport: chromiumDefaultViewport,
-      executablePath: executablePath,
-      headless: true // Or false for debugging
-    });
+    browser = await puppeteer.launch(launchOptions);
     const page = await browser.newPage();
 
     console.log('Navigating to ASCI Complaint Outcomes page...');
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 }); 
 
-    // --- Cookie/Consent Button Handling ---
+    const closeBtnSelector = 'div.cmplz-close';
     try {
-      const closeBtn = await page.$('div.cmplz-close');
-      if (closeBtn) {
-        await closeBtn.click();
-        console.log('Closed cookie banner.');
-        await new Promise(resolve => setTimeout(resolve, 1000)); 
-      }
-    } catch (error) {
-      console.log('No cookie banner (with selector "div.cmplz-close") found or an error occurred during interaction.');
+      await page.waitForSelector(closeBtnSelector, { timeout: 5000 });
+      console.log('Closing cookie banner...');
+      await page.click(closeBtnSelector);
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    } catch (e) {
+      console.log('No cookie banner found or failed to close popup:', e.message);
     }
-    // --- End Cookie/Consent Button Handling ---
 
     const articleListContainerSelector = 'ul.searchBarCon_ul.searchBarCon_ul_comOutcome';
     console.log(`Waiting for article list container: ${articleListContainerSelector}...`);
@@ -116,7 +85,6 @@ export default async function handler(req, res) {
       console.log('Filter checkboxes found.');
     } catch (error) {
       console.error('ERROR: Filters not found within timeout:', error.message);
-      // Return a 500 status if filters are crucial and not found
       return res.status(500).json({ success: false, error: 'Scraping failed: Filters not found.' });
     }
 
@@ -193,7 +161,7 @@ export default async function handler(req, res) {
     }
 
     console.log(`Successfully scraped ${articles.length} articles.`);
-    return res.status(200).json(articles);
+    return res.status(200).json({ success: true, data: articles });
 
   } catch (err) {
     console.error('An unhandled error occurred during the main scraping process:', err.message);

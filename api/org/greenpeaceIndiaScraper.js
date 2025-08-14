@@ -63,10 +63,10 @@ export default async function handler(req, res) {
           args: chromiumArgs,           
           defaultViewport: chromiumDefaultViewport, 
           executablePath: executablePath, 
-          headless: true,               
+          headless: 'new',               
         }
       : {
-          headless: true,               
+          headless: 'new',               
           defaultViewport: null,        
           args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'], 
         };
@@ -86,7 +86,12 @@ export default async function handler(req, res) {
     console.log('Scraping articles...');
     const articles = await page.evaluate(() => {
       const posts = Array.from(document.querySelectorAll('li.wp-block-post'));
-
+      
+      if (!Array.isArray(posts)) {
+        console.warn('Posts variable is not an array. Returning an empty array.');
+        return [];
+      }
+    
       return posts.slice(0, 10).map(post => { 
         const linkEl = post.querySelector('a[href][target="_self"]');
         const url = linkEl ? linkEl.href : null;
