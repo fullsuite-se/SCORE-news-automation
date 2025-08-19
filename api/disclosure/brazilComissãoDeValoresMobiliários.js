@@ -1,58 +1,51 @@
 const isVercelEnvironment = !!process.env.AWS_REGION;
 
 async function getBrowserModules() {
-  await import('puppeteer-extra-plugin-stealth/evasions/chrome.app/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/chrome.csi/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/chrome.loadTimes/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/chrome.runtime/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/defaultArgs/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/iframe.contentWindow/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/media.codecs/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/navigator.hardwareConcurrency/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/navigator.languages/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/navigator.permissions/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/navigator.plugins/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/navigator.vendor/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/navigator.webdriver/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/sourceurl/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/user-agent-override/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/webgl.vendor/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/window.outerdimensions/index.js');
+  const puppeteerExtraModule = await import('puppeteer-extra');
+  const puppeteerExtra = puppeteerExtraModule.default;
 
-  const puppeteer = (await import('puppeteer-extra')).default;
-  // stealth plugin to hide puppeteer
-  const StealthPlugin = (await import('puppeteer-extra-plugin-stealth')).default;
-  puppeteer.use(StealthPlugin());
-
-  const UserPreferencesPlugin = (await import('puppeteer-extra-plugin-user-preferences')).default;
-  puppeteer.use(UserPreferencesPlugin());
-  const UserDataDirPlugin = (await import('puppeteer-extra-plugin-user-data-dir')).default;
-  puppeteer.use(UserDataDirPlugin());
+  const stealthPluginModule = await import('puppeteer-extra-plugin-stealth');
+  const stealthPlugin = stealthPluginModule.default;
   
-  const { default: ChromiumClass } = await import('@sparticuz/chromium');
-  console.log('--- Debugging ChromiumClass object (Vercel) ---');
-  console.log('Type of ChromiumClass:', typeof ChromiumClass);
-  console.log('Keys of ChromiumClass:', Object.keys(ChromiumClass));
-  console.log('Full ChromiumClass object:', ChromiumClass);
-  console.log('ChromiumClass.executablePath is a function:', typeof ChromiumClass.executablePath === 'function');
-  console.log('ChromiumClass.args:', ChromiumClass.args);
-  console.log('ChromiumClass.defaultViewport:', ChromiumClass.defaultViewport);
-  console.log('--- End ChromiumClass Debug (Vercel) ---');
-  let executablePathValue = null;
-  if (typeof ChromiumClass.executablePath === 'function') {
-    executablePathValue = await ChromiumClass.executablePath();
-    // executablePathValue = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+  const UserPreferencesPluginModule = await import('puppeteer-extra-plugin-user-preferences');
+  const UserPreferencesPlugin = UserPreferencesPluginModule.default;
+
+  const UserDataDirPluginModule = await import('puppeteer-extra-plugin-user-data-dir');
+  const UserDataDirPlugin = UserDataDirPluginModule.default;
+
+  puppeteerExtra.use(stealthPlugin());
+  puppeteerExtra.use(UserPreferencesPlugin());
+  puppeteerExtra.use(UserDataDirPlugin());
+
+  if (isVercelEnvironment) {
+    const { default: ChromiumClass } = await import('@sparticuz/chromium');
+    
+    const executablePathValue = await ChromiumClass.executablePath();
+    
+    return {
+      puppeteer: puppeteerExtra,
+      launchOptions: {
+        args: ChromiumClass.args,
+        defaultViewport: ChromiumClass.defaultViewport,
+        executablePath: executablePathValue,
+        headless: 'new',
+      }
+    };
   } else {
-    executablePathValue = ChromiumClass.executablePath;
-    // executablePathValue = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+    return {
+      puppeteer: puppeteerExtra,
+      launchOptions: {
+        headless: 'new',
+        slowMo: 50,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-gpu',
+          '--disable-dev-shm-usage',
+        ],
+      }
+    };
   }
-  console.log('EXECUTABLE PATH VALUE: ', executablePathValue);
-  return {
-    puppeteer,
-    chromiumArgs: ChromiumClass.args,
-    chromiumDefaultViewport: ChromiumClass.defaultViewport,
-    executablePath: executablePathValue
-  };
 }
 
 export default async function handler(req, res) {
@@ -60,29 +53,14 @@ export default async function handler(req, res) {
   const url = 'https://www.gov.br/cvm/pt-br/search?origem=form&SearchableText=CBPS';
 
   try {
-    const { puppeteer, chromiumArgs, chromiumDefaultViewport, executablePath } = await getBrowserModules();
+    const { puppeteer, launchOptions } = await getBrowserModules();
 
-    console.log('Attempting to launch Puppeteer browser...');
-    const launchOptions = isVercelEnvironment
-    ? {
-        args: chromiumArgs,
-        defaultViewport: chromiumDefaultViewport,
-        executablePath: executablePath,
-        headless: "new", // Must be true for serverless environments
-      }
-    : {
-        headless: "new", // Set to true for consistency, or false for local visual debugging
-        defaultViewport: null,
-        slowMo: 50,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
-        executablePath: executablePath,
-      };
-    
     console.log('--- Puppeteer Launch Information ---');
     console.log('Is Vercel Environment:', isVercelEnvironment);
     console.log('Launch Options:', JSON.stringify(launchOptions, null, 2));
     console.log('--- End Launch Info ---');
     
+    console.log('Attempting to launch Puppeteer browser...');
     browser = await puppeteer.launch(launchOptions);
     const page = await browser.newPage();
 
@@ -106,7 +84,7 @@ export default async function handler(req, res) {
     console.log(`Waiting for individual article items to load: ${articleItemSelector}...`);
 
     try {
-      await page.waitForSelector(articleItemSelector, { timeout: 15000 });
+      await page.waitForSelector(articleItemSelector, { timeout: 30000 });
       console.log('Individual article items found. Starting scraping process.');
     } catch (error) {
       console.error('ERROR: No article items found within timeout:', error.message);

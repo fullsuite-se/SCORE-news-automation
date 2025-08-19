@@ -1,83 +1,51 @@
 const isVercelEnvironment = !!process.env.AWS_REGION;
 
 async function getBrowserModules() {
-  await import('puppeteer-extra-plugin-stealth/evasions/chrome.app/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/chrome.csi/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/chrome.loadTimes/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/chrome.runtime/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/defaultArgs/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/iframe.contentWindow/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/media.codecs/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/navigator.hardwareConcurrency/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/navigator.languages/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/navigator.permissions/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/navigator.plugins/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/navigator.vendor/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/navigator.webdriver/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/sourceurl/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/user-agent-override/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/webgl.vendor/index.js');
-  await import('puppeteer-extra-plugin-stealth/evasions/window.outerdimensions/index.js');
+  const puppeteerExtraModule = await import('puppeteer-extra');
+  const puppeteerExtra = puppeteerExtraModule.default;
 
-  const puppeteer = (await import('puppeteer-extra')).default;
-  // stealth plugin to hide puppeteer
-  const StealthPlugin = (await import('puppeteer-extra-plugin-stealth')).default;
-  puppeteer.use(StealthPlugin());
-
-  const UserPreferencesPlugin = (await import('puppeteer-extra-plugin-user-preferences')).default;
-  puppeteer.use(UserPreferencesPlugin());
-  const UserDataDirPlugin = (await import('puppeteer-extra-plugin-user-data-dir')).default;
-  puppeteer.use(UserDataDirPlugin());
+  const stealthPluginModule = await import('puppeteer-extra-plugin-stealth');
+  const stealthPlugin = stealthPluginModule.default;
   
-  const recaptchaPluginModule = await import('puppeteer-extra-plugin-recaptcha');
-  const RecaptchaPlugin = recaptchaPluginModule.default;
+  const UserPreferencesPluginModule = await import('puppeteer-extra-plugin-user-preferences');
+  const UserPreferencesPlugin = UserPreferencesPluginModule.default;
 
-  let puppeteerInstance;
-  let launchOptions;
+  const UserDataDirPluginModule = await import('puppeteer-extra-plugin-user-data-dir');
+  const UserDataDirPlugin = UserDataDirPluginModule.default;
+
+  puppeteerExtra.use(stealthPlugin());
+  puppeteerExtra.use(UserPreferencesPlugin());
+  puppeteerExtra.use(UserDataDirPlugin());
 
   if (isVercelEnvironment) {
-    const { default: Chromium } = await import('@sparticuz/chromium');
+    const { default: ChromiumClass } = await import('@sparticuz/chromium');
     
-    puppeteerInstance = puppeteer;
-    // Apply the stealth plugin to the puppeteer-core instance
-    puppeteerInstance.use(StealthPlugin());
-
-    const executablePath = await Chromium.executablePath();
-    if (!executablePath) {
-      throw new Error('Chromium executable path not found on Vercel.');
-    }
+    const executablePathValue = await ChromiumClass.executablePath();
     
-    launchOptions = {
-      args: Chromium.args,
-      defaultViewport: Chromium.defaultViewport,
-      executablePath: executablePath,
-      headless: 'new',
+    return {
+      puppeteer: puppeteerExtra,
+      launchOptions: {
+        args: ChromiumClass.args,
+        defaultViewport: ChromiumClass.defaultViewport,
+        executablePath: executablePathValue,
+        headless: 'new',
+      }
     };
   } else {
-    const puppeteerExtraModule = await import('puppeteer-extra');
-    puppeteerInstance = puppeteerExtraModule.default;
-    // Apply all plugins for local development
-    puppeteerInstance.use(stealthPlugin());
-    puppeteerInstance.use(
-      RecaptchaPlugin({
-        provider: { id: '2captcha', token: 'YOUR_2CAPTCHA_API_KEY' },
-        visualFeedback: true,
-      })
-    );
-
-    launchOptions = {
-      headless: 'new',
-      slowMo: 50,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-gpu',
-        '--disable-dev-shm-usage',
-      ],
+    return {
+      puppeteer: puppeteerExtra,
+      launchOptions: {
+        headless: 'new',
+        slowMo: 50,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-gpu',
+          '--disable-dev-shm-usage',
+        ],
+      }
     };
   }
-
-  return { puppeteer: puppeteerInstance, launchOptions };
 }
 
 export default async function handler(req, res) {
@@ -99,41 +67,40 @@ export default async function handler(req, res) {
     console.log(`Navigating to ASIC Newsroom search results: ${url}`);
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-    // --- CAPTCHA Solving Logic (Enabled locally, skipped on Vercel) ---
-    if (!isVercelEnvironment && typeof page.solveRecaptchas === 'function') {
-      console.log('Checking for reCAPTCHA or hCaptcha challenges...');
-      await page.solveRecaptchas();
-      console.log('CAPTCHA solving attempted. Proceeding with scraping...');
-      await page.waitForNavigation({ waitUntil: 'domcontentloaded' }).catch(() => {});
-    }
-    // --- End CAPTCHA Logic ---
-
     const articleListContainerSelector = 'ul#nr-list';
-    console.log(`Waiting for article list container: ${articleListContainerSelector}...`);
+    console.log(`Waiting for individual article items to load: ${articleListContainerSelector} li...`);
     try {
-      await page.waitForSelector(articleListContainerSelector, { timeout: 15000 });
-      console.log('Article list container found.');
+      await page.waitForSelector(`${articleListContainerSelector} li`, { timeout: 60000 });
+      console.log('Individual article items found. Starting scraping process.');
     } catch (error) {
-      console.error('ERROR: Article list container not found within timeout:', error.message);
-      return res.status(500).json({ success: false, error: 'Scraping failed: Article list container not found.' });
+      console.error('ERROR: No article items found within timeout:', error.message);
+      return res.status(500).json({ success: false, error: 'Scraping failed: Article items not found.' });
     }
 
-    console.log('Starting scraping process within the article list container.');
     const articles = await page.evaluate((listContainerSel) => {
       const items = Array.from(document.querySelectorAll(`${listContainerSel} li`));
       const seenUrls = new Set();
       const results = [];
 
       items.forEach(item => {
-        const linkEl = item.querySelector('h3 a');
-        const dateEl = item.querySelector('p.nr-date');
+        let title = null;
+        let url = null;
+        let date = null;
 
-        const url = linkEl?.href;
-        const title = linkEl?.textContent?.trim();
-        const date = dateEl?.textContent?.trim().replace(/^Date:\s*/i, '');
+        const linkEl = item.querySelector('h3 a');
+        if (linkEl) {
+          title = linkEl.textContent.trim();
+          url = new URL(linkEl.href, window.location.origin).href;
+        }
+
+        const dateEl = item.querySelector('p.nr-date');
+        if (dateEl) {
+          date = dateEl.textContent.trim();
+          date = date.replace(/^Date:\s*/i, '');
+        }
 
         if (title && url && date && !seenUrls.has(url)) {
-          seenUrls.add(url);
+          seen.add(url);
           results.push({ title, url, date });
         }
       });
@@ -155,8 +122,8 @@ export default async function handler(req, res) {
     return res.status(500).json({ success: false, error: 'Scraping failed', details: err.message });
   } finally {
     if (browser) {
-      console.log('Closing browser...');
       await browser.close();
+      console.log('Browser closed.');
     }
   }
 }
