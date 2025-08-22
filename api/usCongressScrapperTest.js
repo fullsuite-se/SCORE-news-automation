@@ -118,11 +118,32 @@ export default async function (req, res) {
                       .querySelector(".result-title")
                       ?.innerText.trim()}` || "";
                 
-                const firstSelector = item.querySelectorAll(".result-item a")[2]?.innerText.trim();
-
-                const displayTitle = firstSelector && firstSelector.includes("PDF")
-                    ? item.querySelector(".result-item:nth-child(5)")?.innerText.trim() || ""
-                    : firstSelector || "";
+              let displayTitle = "";
+                const latestActionSpan = Array.from(
+                item.querySelectorAll("span.result-item")
+                ).find((span) => span.textContent.includes("Latest Action"));
+                if (latestActionSpan) {
+                const linkTitle = Array.from(latestActionSpan.querySelectorAll("a"))
+                    .map((a) => a.innerText.trim())
+                    .find((t) => !/PDF|All Actions/i.test(t));
+                if (linkTitle) {
+                    displayTitle = linkTitle;
+                } else {
+                    const text = latestActionSpan.textContent || "";
+                    const match = text.match(
+                    /\b(Public|Private)\s+Law(?:\s+No\.?\s*|\s+)?[\w\-]+/i
+                    );
+                    if (match) {
+                    let raw = match[0].trim();
+                    raw = raw.replace(/\s+law/i, " Law");
+                    if (!/No/i.test(raw)) {
+                        raw = raw.replace(/Law\s+(\d)/i, "Law No. $1");
+                    }
+                    displayTitle = raw;
+                    }
+                }
+                }
+            
 
                 const sourceRel =
                     item.querySelector(".result-heading a")?.getAttribute("href") || "";
@@ -131,19 +152,15 @@ export default async function (req, res) {
                     : "https://congress.gov" + sourceRel;
 
                 let pdflink = null;
-                const latestActionSpan = Array.from(
-                    item.querySelectorAll("span.result-item")
-                    ).find((span) => span.textContent.includes("Latest Action"));
-
-                if (latestActionSpan) {
+                    if (latestActionSpan) {
                     const pdfAnchor = latestActionSpan.querySelector('a[href$=".pdf"]');
                     if (pdfAnchor) {
                         const href = pdfAnchor.getAttribute("href");
                         pdflink = href.startsWith("http")
-                            ? href
-                            : "https://congress.gov" + href;
-                        }
+                        ? href
+                        : "https://congress.gov" + href;
                     }
+                }
                     return {length, legislationName, displayTitle, sourcelink, pdflink};
                 })
                 return results;
