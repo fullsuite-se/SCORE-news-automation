@@ -54,35 +54,6 @@ async function getBrowserModules() {
     executablePath: executablePathValue
   };
 
-  if (isVercelEnvironment) {
-    const { default: ChromiumClass } = await import('@sparticuz/chromium');
-    
-    const executablePathValue = await ChromiumClass.executablePath();
-    
-    return {
-      puppeteer: puppeteerExtra,
-      launchOptions: {
-        args: ChromiumClass.args,
-        defaultViewport: ChromiumClass.defaultViewport,
-        executablePath: executablePathValue,
-        headless: 'new',
-      }
-    };
-  } else {
-    return {
-      puppeteer: puppeteerExtra,
-      launchOptions: {
-        headless: 'new',
-        slowMo: 50,
-        args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
-          '--disable-gpu',
-          '--disable-dev-shm-usage',
-        ],
-      }
-    };
-  }
 }
 
 export default async function handler(req, res) {
@@ -90,7 +61,21 @@ export default async function handler(req, res) {
   const url = 'https://www.asic.gov.au/newsroom/search/?tag=sustainable%20finance';
 
   try {
-    const { puppeteer, launchOptions } = await getBrowserModules();
+    const { puppeteer, chromiumArgs, chromiumDefaultViewport, executablePath } = await getBrowserModules();
+
+    console.log('Attempting to launch Puppeteer browser...');
+    const launchOptions = isVercelEnvironment
+      ? {
+          args: chromiumArgs,           
+          defaultViewport: chromiumDefaultViewport, 
+          executablePath: executablePath, 
+          headless: true,               
+        }
+      : {
+          headless: true,               
+          defaultViewport: null,        
+          args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'], 
+        };
 
     console.log('--- Puppeteer Launch Information ---');
     console.log('Is Vercel Environment:', isVercelEnvironment);

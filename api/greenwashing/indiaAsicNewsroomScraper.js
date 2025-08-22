@@ -60,8 +60,22 @@ export default async function handler(req, res) {
   const url = 'https://www.ascionline.in/complaint-outcomes/';
 
   try {
-    const { puppeteer, launchOptions } = await getBrowserModules();
+    const { puppeteer, chromiumArgs, chromiumDefaultViewport, executablePath } = await getBrowserModules();
 
+    console.log('Attempting to launch Puppeteer browser...');
+    const launchOptions = isVercelEnvironment
+      ? {
+          args: chromiumArgs,           
+          defaultViewport: chromiumDefaultViewport, 
+          executablePath: executablePath, 
+          headless: true,               
+        }
+      : {
+          headless: true,               
+          defaultViewport: null,        
+          args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'], 
+        };
+        
     console.log('--- Puppeteer Launch Information ---');
     console.log('Is Vercel Environment:', isVercelEnvironment);
     console.log('Launch Options:', JSON.stringify(launchOptions, null, 2));
