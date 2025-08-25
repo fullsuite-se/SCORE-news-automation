@@ -12,7 +12,7 @@ async function scrapeArticlesWithPuppeteer(url) {
         // Launch a headless browser instance.
         // `headless: true` runs Chrome without a visible UI.
         // Set to `headless: false` if you want to see the browser automation.
-        browser = await puppeteer.launch({ headless: false });
+        browser = await puppeteer.launch({ headless: true });
         const page = await browser.newPage();
 
         // Set a default timeout for navigation (e.g., 60 seconds)
@@ -59,16 +59,19 @@ async function scrapeArticlesWithPuppeteer(url) {
             console.warn(`DIAGNOSTIC (Outer): No cookie banner/accept button found or it timed out, or click failed. Proceeding without explicit cookie acceptance. Error: ${cookieError.message}`);
         }
 
-       console.log("DIAGNOSTIC (Outer): Waiting for 'ul.gsc-excerpt-list' to appear...");
+        /*
+         console.log("DIAGNOSTIC (Outer): Waiting for 'ul.gsc-excerpt-list' to appear...");
         await page.waitForSelector('ul.gsc-excerpt-list', { timeout: 10000 });
         console.log("DIAGNOSTIC (Outer): 'ul.gsc-excerpt-list' found.");
-
+ 
+        */
+      
         // --- NEW ROBUST WAITING STRATEGY: Wait for a minimum number of date-grouping list items ---
        const scrapedData = await page.evaluate((maxArticles) => {
             const results = [];
             // Find all elements that represent an article container.
             // <--- REPLACE THIS SELECTOR with the actual article container selector
-            const articleElements = document.querySelectorAll('c-listing__items > div.views-row');
+            const articleElements = document.querySelectorAll('div.grid > div');
 
             if (articleElements.length === 0) {
                 console.warn("DIAGNOSTIC (Inner): No <article> elements found with the specified main selector ('.view-content > div.views-row > article').");
@@ -84,17 +87,17 @@ async function scrapeArticlesWithPuppeteer(url) {
 
                 // Extract Title
                 // <--- REPLACE THIS SELECTOR
-                const titleElement = articleElement.querySelector('article > h3 > a');
+                const titleElement = articleElement.querySelector('div.h-full > div.flex > a > h4');
                 const title = titleElement ? titleElement.innerText.trim() : 'N/A';
 
                 // Extract Date
                 // <--- REPLACE THIS SELECTOR
-                const dateElement = articleElement.querySelector('article > small > span.c-list-item__meta-date');
+                const dateElement = articleElement.querySelector('div.h-full > div.flex > a > p');
                 const date = dateElement ? dateElement.innerText.trim() : 'N/A'
 
                 // Extract Link
                 // <--- REPLACE THIS SELECTOR
-                const linkElement = articleElement.querySelector('article > h3 > a');
+                const linkElement = articleElement.querySelector('a');
                 // Use window.location.origin to ensure absolute URLs
                 const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
 
@@ -126,7 +129,7 @@ async function scrapeArticlesWithPuppeteer(url) {
         return [];
     } finally {
         if (browser) {
-            //await browser.close();
+            await browser.close();
         }
         console.log("Browser closed.");
     }
@@ -134,7 +137,7 @@ async function scrapeArticlesWithPuppeteer(url) {
 
 // --- Configuration ---
 // <--- REPLACE THIS WITH THE ACTUAL URL OF THE WEBSITE YOU WANT TO SCRAPE
-const targetUrl = 'https://enb.iisd.org/archives';
+const targetUrl = 'https://shena.gov.bn/news';
 
 // --- Run the scraper ---
 scrapeArticlesWithPuppeteer(targetUrl)

@@ -43,88 +43,50 @@ async function scrapeArticlesWithPuppeteer(url) {
 
         // Use page.evaluate() to run JavaScript code within the context of the browser page.
         // This is where you'll use the DOM manipulation logic similar to the client-side script.
-       const dateGroupingItemSelector = 'ul.gsc-excerpt-list > li.gsc-excerpt-list__item';
-        const minExpectedDateGroups = 1; // At least one date group should be present
+       const scrapedData = await page.evaluate((maxArticles) => {
+            const results = [];
+            // Find all elements that represent an article container.
+            // <--- REPLACE THIS SELECTOR with the actual article container selector
+            const articleElements = document.querySelectorAll('div.main > dl.date_sp');
 
-        console.log(`DIAGNOSTIC (Outer): Waiting for at least ${minExpectedDateGroups} date grouping items to be present using waitForFunction...`);
-        await page.waitForFunction(
-            (selector, minCount) => document.querySelectorAll(selector).length >= minCount,
-            { timeout: 30000 }, // Max wait time
-            dateGroupingItemSelector,
-            minExpectedDateGroups
-        );
-        console.log(`DIAGNOSTIC (Outer): At least ${minExpectedDateGroups} date grouping items are now present on the page.`);
-        
-        // ADDED: Take a screenshot for visual debugging
-        const screenshotPath = 'debug_screenshot_before_scrape.png';
-        await page.screenshot({ path: screenshotPath, fullPage: true });
-        console.log(`DIAGNOSTIC (Outer): Screenshot saved to ${screenshotPath}`);
-
-
-        console.log("DIAGNOSTIC (Outer): About to scrape articles using nested iteration.");
-
-        // Get all date-grouping list items as ElementHandle objects
-        const dateGroupingHandles = await page.$$(dateGroupingItemSelector);
-
-        if (dateGroupingHandles.length === 0) {
-            console.warn("DIAGNOSTIC (Outer): page.$$() found 0 date grouping items. Investigate page rendering.");
-        } else {
-            console.log(`DIAGNOSTIC (Outer): page.$$() found ${dateGroupingHandles.length} total date grouping items.`);
-        }
-
-        // Iterate over each date-grouping ElementHandle
-        for (const dateGroupHandle of dateGroupingHandles) {
-            // Extract the date for this group
-            const groupDate = await dateGroupHandle.evaluate(element => {
-                const dateHeading = element.querySelector('h2.gsc-excerpt-list__item-date');
-                return dateHeading ? dateHeading.innerText.trim() : 'N/A';
-            });
-
-            // Get the individual article items within this date group
-            const individualArticleHandles = await dateGroupHandle.$$('ul.gsc-u-list-unstyled > li.gsc-excerpt-item');
-
-            if (individualArticleHandles.length === 0) {
-                console.warn(`DIAGNOSTIC (Outer): No individual articles found for date group: ${groupDate}.`);
-                continue; // Skip to the next date group if no articles are found
+            if (articleElements.length === 0) {
+                console.warn("DIAGNOSTIC (Inner): No <article> elements found with the specified main selector ('.view-content > div.views-row > article').");
+                console.warn("DIAGNOSTIC (Inner): Please ensure this selector is correct and the content is loaded on the page.");
+                return [];
+            } else {
+                console.log(`DIAGNOSTIC (Inner): Found ${articleElements.length} potential article elements.`);
             }
 
-            for (let i = 0; i < individualArticleHandles.length; i++) {
-                // Limit the total number of articles scraped
-                if (articles.length >= maxArticles) {
-                    console.log(`DIAGNOSTIC (Outer): Reached maxArticles limit (${maxArticles}). Stopping scrape.`);
-                    break; // Exit inner loop
-                }
+            for (let i = 0; i < Math.min(articleElements.length, maxArticles); i++) {
+                const articleElement = articleElements[i];
 
-                const articleHandle = individualArticleHandles[i];
 
-                // Use element.evaluate() to run JavaScript code on the specific article handle
-                const articleData = await articleHandle.evaluate((element, currentGroupDate) => {
-                    // --- Extract Title and Link: ---
-                    const articleLinkElement = element.querySelector('a.gsc-excerpt-item__link');
-                    // The title is inside a span within the link
-                    const titleElement = articleLinkElement ? articleLinkElement.querySelector('span.gsc-excerpt-item__title') : null;
-                    const title = titleElement ? titleElement.innerText.trim() : 'N/A';
-                    // The link is the href of the main <a> tag
-                    const link = articleLinkElement ? new URL(articleLinkElement.getAttribute('href'), window.location.origin).href : 'N/A';
+                // Extract Title
+                // <--- REPLACE THIS SELECTOR
+                const titleElement = articleElement.querySelector('a');
+                const title = titleElement ? titleElement.innerText.trim() : 'N/A';
 
-                    // --- Extract Time and combine with Group Date: ---
-                    const timeElement = articleLinkElement ? articleLinkElement.querySelector('time.gsc-date__date') : null;
-                    const time = timeElement ? timeElement.getAttribute('datetime') : ''; // Get the full datetime string
+                // Extract Date
+                // <--- REPLACE THIS SELECTOR
+                const dateElement = articleElement.querySelector('dt');
+                const date = dateElement ? dateElement.innerText.trim() : 'N/A'
 
-                    // Combine group date and article time for a complete timestamp
-                    // Example: "24 July 2025" and "7/24/2025 11:15:00 AM"
-                    // We'll use the datetime attribute directly as it's often machine-readable.
-                    const fullDateTime = time || currentGroupDate; // Prefer datetime attribute, fallback to group date
+                // Extract Link
+                // <--- REPLACE THIS SELECTOR
+                const linkElement = articleElement.querySelector('a');
+                // Use window.location.origin to ensure absolute URLs
+                const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
 
-                    return { title, date: fullDateTime, link };
-                }, groupDate); // Pass groupDate as an argument to evaluate
-
-                articles.push(articleData);
+                results.push({
+                    title: title,
+                    url: link,
+                    date: date,
+                });
             }
-            if (articles.length >= maxArticles) {
-                break; // Exit outer loop if maxArticles limit is reached
-            }
-        }
+            return results;
+        }, maxArticles); // Pass maxArticles to the page.evaluate context
+
+        articles.push(...scrapedData);
 
         console.log(`Successfully scraped ${articles.length} articles:`);
         console.table(articles);
@@ -150,7 +112,7 @@ async function scrapeArticlesWithPuppeteer(url) {
 
 // --- Configuration ---
 // <--- REPLACE THIS WITH THE ACTUAL URL OF THE WEBSITE YOU WANT TO SCRAPE
-const targetUrl = 'https://www.consilium.europa.eu/en/press/press-releases/?keyword=&DateFrom=&DateTo=&Topic=122254&Topic=122124&Topic=122161&Topic=122178';
+const targetUrl = 'https://www.meti.go.jp/english/press/category_06.html';
 
 // --- Run the scraper ---
 scrapeArticlesWithPuppeteer(targetUrl)

@@ -84,7 +84,7 @@ export default async function (req, res) {
       };
   let browser;
 
-  const url = `link`
+  const url = `https://www.meti.go.jp/english/press/category_06.html`
   const articles = [];
   const maxArticles = 10;
   try {
@@ -99,36 +99,40 @@ export default async function (req, res) {
             const results = [];
             // Find all elements that represent an article container.
             // <--- REPLACE THIS SELECTOR with the actual article container selector
-            const articleElements = document.querySelectorAll('table[summary="Latest Statements List "] tbody tr');
+            const articleElements = document.querySelectorAll('div.main > dl.date_sp');
 
             if (articleElements.length === 0) {
-                console.warn("No article container elements found with the provided selector. Please check your selector.");
+                console.warn("DIAGNOSTIC (Inner): No <article> elements found with the specified main selector ('.view-content > div.views-row > article').");
+                console.warn("DIAGNOSTIC (Inner): Please ensure this selector is correct and the content is loaded on the page.");
                 return [];
+            } else {
+                console.log(`DIAGNOSTIC (Inner): Found ${articleElements.length} potential article elements.`);
             }
 
             for (let i = 0; i < Math.min(articleElements.length, maxArticles); i++) {
                 const articleElement = articleElements[i];
 
+
                 // Extract Title
                 // <--- REPLACE THIS SELECTOR
-                const titleElement = articleElement.querySelector('td:nth-child(2) a');
+                const titleElement = articleElement.querySelector('a');
                 const title = titleElement ? titleElement.innerText.trim() : 'N/A';
 
                 // Extract Date
                 // <--- REPLACE THIS SELECTOR
-                const dateElement = articleElement.querySelector('td:nth-child(3)');
-                const date = dateElement ? dateElement.innerText.trim() : 'N/A';
+                const dateElement = articleElement.querySelector('dt');
+                const date = dateElement ? dateElement.innerText.trim() : 'N/A'
 
                 // Extract Link
                 // <--- REPLACE THIS SELECTOR
-                const linkElement = articleElement.querySelector('td:nth-child(2) a');
+                const linkElement = articleElement.querySelector('a');
                 // Use window.location.origin to ensure absolute URLs
                 const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
 
                 results.push({
                     title: title,
                     url: link,
-                    date: date
+                    date: date,
                 });
             }
             return results;
