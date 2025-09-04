@@ -60,7 +60,7 @@ export default async function (req, res) {
       };
 
   let browser;
-  const baseUrl = 'https://www.mom.gov.sg/newsroom/press-releases?page=2';
+  const baseUrl = 'https://www.mom.gov.sg/newsroom/press-releases?page=1';
 
   try {
     console.log('Attempting to launch Puppeteer with options:', JSON.stringify(launchOptions, null, 2));

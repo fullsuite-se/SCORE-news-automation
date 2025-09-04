@@ -17,13 +17,14 @@ async function scrapeArticlesWithPuppeteer(url) {
         browser = await puppeteer.launch({
             headless: true, // Still run headless, but with stealth features
             args: [
-                '--no-sandbox', // Recommended for some environments
+                '--no-sandbox',
                 '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage', // Overcomes limited resource problems
-                '--disable-accelerated-2d-canvas',
-                '--no-first-run',
-                '--no-zygote',
-                '--disable-gpu' // Often helps with compatibility
+                '--disable-infobars',
+                '--window-position=0,0',
+                '--ignore-certifcate-errors',
+                '--ignore-certifcate-errors-spki-list',
+                '--disable-speech-api', // Disable speech api
+                '--disable-features=site-per-process' // Often helps with compatibility
             ]
         });
         const page = await browser.newPage();
@@ -47,10 +48,10 @@ async function scrapeArticlesWithPuppeteer(url) {
             const results = [];
             // Find all elements that represent an article container.
             // <--- REPLACE THIS SELECTOR with the actual article container selector
-            const articleElements = document.querySelectorAll('div.main > dl.date_sp');
+            const articleElements = document.querySelectorAll('div#NewsListingAllListing2 > div.row > div');
 
             if (articleElements.length === 0) {
-                console.warn("DIAGNOSTIC (Inner): No <article> elements found with the specified main selector ('.view-content > div.views-row > article').");
+                console.warn("DIAGNOSTIC (Inner): No <article> elements found with the specified main selector.");
                 console.warn("DIAGNOSTIC (Inner): Please ensure this selector is correct and the content is loaded on the page.");
                 return [];
             } else {
@@ -63,17 +64,18 @@ async function scrapeArticlesWithPuppeteer(url) {
 
                 // Extract Title
                 // <--- REPLACE THIS SELECTOR
-                const titleElement = articleElement.querySelector('a');
-                const title = titleElement ? titleElement.innerText.trim() : 'N/A';
+                const titleElement = articleElement.querySelector('div.media-item > div.media-content > h3');
+                // const title = titleElement ? titleElement.innerText.trim() : 'N/A';
+                const title = titleElement ? titleElement.getAttribute('title') : 'N/A';
 
                 // Extract Date
                 // <--- REPLACE THIS SELECTOR
-                const dateElement = articleElement.querySelector('dt');
+                const dateElement = articleElement.querySelector('div.media-item > div.media-content > span.date');
                 const date = dateElement ? dateElement.innerText.trim() : 'N/A'
 
                 // Extract Link
                 // <--- REPLACE THIS SELECTOR
-                const linkElement = articleElement.querySelector('a');
+                const linkElement = articleElement.querySelector('div.media-item > div.media-content > a');
                 // Use window.location.origin to ensure absolute URLs
                 const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
 
@@ -112,7 +114,7 @@ async function scrapeArticlesWithPuppeteer(url) {
 
 // --- Configuration ---
 // <--- REPLACE THIS WITH THE ACTUAL URL OF THE WEBSITE YOU WANT TO SCRAPE
-const targetUrl = 'https://www.meti.go.jp/english/press/category_06.html';
+const targetUrl = 'https://www.mecc.gov.qa/English/About/Pages/News.aspx';
 
 // --- Run the scraper ---
 scrapeArticlesWithPuppeteer(targetUrl)

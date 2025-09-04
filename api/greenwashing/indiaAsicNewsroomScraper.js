@@ -190,7 +190,7 @@ export default async function handler(req, res) {
     }
 
     console.log(`Successfully scraped ${articles.length} articles.`);
-    return res.status(200).json({ success: true, data: articles });
+    return res.status(200).json(articles);
 
   } catch (err) {
     console.error('An unhandled error occurred during the main scraping process:', err.message);

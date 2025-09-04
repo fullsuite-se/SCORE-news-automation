@@ -39,7 +39,7 @@ async function getBrowserModules() {
 
 export default async function handler(req, res) {
   let browser; 
-  const url = 'link';
+  const url = 'https://kehutanan.go.id/pers';
 
   try {
     const { puppeteer, chromiumArgs, chromiumDefaultViewport, executablePath } = await getBrowserModules();

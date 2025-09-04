@@ -39,7 +39,7 @@ async function getBrowserModules() {
 
 export default async function handler(req, res) {
   let browser; 
-  const url = 'https://shena.gov.bn/news';
+  const url = 'https://moef.gov.in/orders/update?archive=1';
 
   try {
     const { puppeteer, chromiumArgs, chromiumDefaultViewport, executablePath } = await getBrowserModules();
@@ -83,14 +83,14 @@ export default async function handler(req, res) {
     
     //**REPLACE STARTING HERE**
 
-    const scrapedData = await page.evaluate((maxArticles) => {
+   const scrapedData = await page.evaluate((maxArticles) => {
             const results = [];
             // Find all elements that represent an article container.
             // <--- REPLACE THIS SELECTOR with the actual article container selector
-            const articleElements = document.querySelectorAll('div.grid > div');
+            const articleElements = document.querySelectorAll('table#pressTable > tbody> tr');
 
             if (articleElements.length === 0) {
-                console.warn("DIAGNOSTIC (Inner): No <article> elements found with the specified main selector ('.view-content > div.views-row > article').");
+                console.warn("DIAGNOSTIC (Inner): No <article> elements found with the specified main selector.");
                 console.warn("DIAGNOSTIC (Inner): Please ensure this selector is correct and the content is loaded on the page.");
                 return [];
             } else {
@@ -103,17 +103,17 @@ export default async function handler(req, res) {
 
                 // Extract Title
                 // <--- REPLACE THIS SELECTOR
-                const titleElement = articleElement.querySelector('div.h-full > div.flex > a > h4');
+                const titleElement = articleElement.querySelector('td:nth-child(2) > a');
                 const title = titleElement ? titleElement.innerText.trim() : 'N/A';
 
                 // Extract Date
                 // <--- REPLACE THIS SELECTOR
-                const dateElement = articleElement.querySelector('div.h-full > div.flex > a > p');
+                const dateElement = articleElement.querySelector('td:nth-child(3)');
                 const date = dateElement ? dateElement.innerText.trim() : 'N/A'
 
                 // Extract Link
                 // <--- REPLACE THIS SELECTOR
-                const linkElement = articleElement.querySelector('a');
+                const linkElement = articleElement.querySelector('td:nth-child(2) > a');
                 // Use window.location.origin to ensure absolute URLs
                 const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
 

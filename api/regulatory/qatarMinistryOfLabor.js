@@ -39,7 +39,7 @@ async function getBrowserModules() {
 
 export default async function handler(req, res) {
   let browser; 
-  const url = 'https://shena.gov.bn/news';
+  const url = 'lhttps://www.mol.gov.qa/ar/mediacenter/Pages/News.aspx';
 
   try {
     const { puppeteer, chromiumArgs, chromiumDefaultViewport, executablePath } = await getBrowserModules();
@@ -87,10 +87,10 @@ export default async function handler(req, res) {
             const results = [];
             // Find all elements that represent an article container.
             // <--- REPLACE THIS SELECTOR with the actual article container selector
-            const articleElements = document.querySelectorAll('div.grid > div');
+            const articleElements = document.querySelectorAll('div#newslisting > div.col-container');
 
             if (articleElements.length === 0) {
-                console.warn("DIAGNOSTIC (Inner): No <article> elements found with the specified main selector ('.view-content > div.views-row > article').");
+                console.warn("DIAGNOSTIC (Inner): No <article> elements found with the specified main selector.");
                 console.warn("DIAGNOSTIC (Inner): Please ensure this selector is correct and the content is loaded on the page.");
                 return [];
             } else {
@@ -103,17 +103,17 @@ export default async function handler(req, res) {
 
                 // Extract Title
                 // <--- REPLACE THIS SELECTOR
-                const titleElement = articleElement.querySelector('div.h-full > div.flex > a > h4');
+                const titleElement = articleElement.querySelector('div.card > div.card-body > h3 > a');
                 const title = titleElement ? titleElement.innerText.trim() : 'N/A';
-
+                
                 // Extract Date
                 // <--- REPLACE THIS SELECTOR
-                const dateElement = articleElement.querySelector('div.h-full > div.flex > a > p');
+                const dateElement = articleElement.querySelector('div.card > div.card-body > div.dateRow > div.my-1 > span');
                 const date = dateElement ? dateElement.innerText.trim() : 'N/A'
 
                 // Extract Link
                 // <--- REPLACE THIS SELECTOR
-                const linkElement = articleElement.querySelector('a');
+                const linkElement = articleElement.querySelector('div.card > div.card-body > h3 > a');
                 // Use window.location.origin to ensure absolute URLs
                 const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
 

@@ -71,10 +71,10 @@ async function scrapeArticlesWithPuppeteer(url) {
             const results = [];
             // Find all elements that represent an article container.
             // <--- REPLACE THIS SELECTOR with the actual article container selector
-            const articleElements = document.querySelectorAll('div.grid > div');
+            const articleElements = document.querySelectorAll('div.items > div.item');
 
             if (articleElements.length === 0) {
-                console.warn("DIAGNOSTIC (Inner): No <article> elements found with the specified main selector ('.view-content > div.views-row > article').");
+                console.warn("DIAGNOSTIC (Inner): No <article> elements found with the specified main selector.");
                 console.warn("DIAGNOSTIC (Inner): Please ensure this selector is correct and the content is loaded on the page.");
                 return [];
             } else {
@@ -87,13 +87,14 @@ async function scrapeArticlesWithPuppeteer(url) {
 
                 // Extract Title
                 // <--- REPLACE THIS SELECTOR
-                const titleElement = articleElement.querySelector('div.h-full > div.flex > a > h4');
+                const titleElement = articleElement.querySelector('a > span.title');
                 const title = titleElement ? titleElement.innerText.trim() : 'N/A';
-
+                
                 // Extract Date
                 // <--- REPLACE THIS SELECTOR
-                const dateElement = articleElement.querySelector('div.h-full > div.flex > a > p');
-                const date = dateElement ? dateElement.innerText.trim() : 'N/A'
+                const dateElement = articleElement.querySelector('div.date');
+                // const date = dateElement ? dateElement.innerText.trim() : 'N/A'
+                const date = dateElement ? dateElement.innerText.replace(/\n/g, ' ').trim() : 'N/A';
 
                 // Extract Link
                 // <--- REPLACE THIS SELECTOR
@@ -137,7 +138,7 @@ async function scrapeArticlesWithPuppeteer(url) {
 
 // --- Configuration ---
 // <--- REPLACE THIS WITH THE ACTUAL URL OF THE WEBSITE YOU WANT TO SCRAPE
-const targetUrl = 'https://shena.gov.bn/news';
+const targetUrl = 'https://cygm.csb.gov.tr/duyurular';
 
 // --- Run the scraper ---
 scrapeArticlesWithPuppeteer(targetUrl)
