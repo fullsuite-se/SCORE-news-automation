@@ -27,8 +27,8 @@ async function scrapeArticlesWithPuppeteer(url) {
         // Use page.evaluate() to run JavaScript code within the context of the browser page.
         // This is where you'll use the DOM manipulation logic similar to the client-side script.
 
-       const acceptButtonSelector = 'button.gsc-btn.gsc-btn--confirm'; // Example: A button with ID 'accept-cookies'
-        const cookieBannerSelector = 'section.gsc-cookie-section'; // Example: The banner div itself
+       const acceptButtonSelector = 'button#userSelect'; // Example: A button with ID 'accept-cookies'
+        const cookieBannerSelector = 'div#cookieApiData'; // Example: The banner div itself
 
         console.log("DIAGNOSTIC (Outer): Checking for cookie consent banner...");
         try {
@@ -71,7 +71,7 @@ async function scrapeArticlesWithPuppeteer(url) {
             const results = [];
             // Find all elements that represent an article container.
             // <--- REPLACE THIS SELECTOR with the actual article container selector
-            const articleElements = document.querySelectorAll('div.items > div.item');
+            const articleElements = document.querySelectorAll('div.ep_gridrow-content > article.ep_gridcolumn');
 
             if (articleElements.length === 0) {
                 console.warn("DIAGNOSTIC (Inner): No <article> elements found with the specified main selector.");
@@ -87,18 +87,17 @@ async function scrapeArticlesWithPuppeteer(url) {
 
                 // Extract Title
                 // <--- REPLACE THIS SELECTOR
-                const titleElement = articleElement.querySelector('a > span.title');
+                const titleElement = articleElement.querySelector('div.ep_gridcolumn-content h3.ep-a_heading div.ep_title a div.ep-p_text span.ep_name');
                 const title = titleElement ? titleElement.innerText.trim() : 'N/A';
                 
                 // Extract Date
                 // <--- REPLACE THIS SELECTOR
-                const dateElement = articleElement.querySelector('div.date');
-                // const date = dateElement ? dateElement.innerText.trim() : 'N/A'
-                const date = dateElement ? dateElement.innerText.replace(/\n/g, ' ').trim() : 'N/A';
+                const dateElement = articleElement.querySelector('div.ep_gridcolumn-content h3.ep-a_heading div.ep_subtitle time');
+                const date = dateElement ? dateElement.textContent.replace(/\s+/g, ' ').trim() : 'N/A';
 
                 // Extract Link
                 // <--- REPLACE THIS SELECTOR
-                const linkElement = articleElement.querySelector('a');
+                const linkElement = articleElement.querySelector('div.ep_gridcolumn-content h3.ep-a_heading div.ep_title a');
                 // Use window.location.origin to ensure absolute URLs
                 const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
 
@@ -138,7 +137,7 @@ async function scrapeArticlesWithPuppeteer(url) {
 
 // --- Configuration ---
 // <--- REPLACE THIS WITH THE ACTUAL URL OF THE WEBSITE YOU WANT TO SCRAPE
-const targetUrl = 'https://cygm.csb.gov.tr/duyurular';
+const targetUrl = 'https://www.europarl.europa.eu/news/en';
 
 // --- Run the scraper ---
 scrapeArticlesWithPuppeteer(targetUrl)
