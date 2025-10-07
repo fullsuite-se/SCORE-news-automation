@@ -39,7 +39,7 @@ async function getBrowserModules() {
 
 export default async function handler(req, res) {
   let browser; 
-  const url = 'https://www.mol.gov.qa/ar/mediacenter/Pages/News.aspx';
+  const url = 'https://www.servindi.org/noticias?title=&field_categoria_tid=All&field_lugar_tid=All';
 
   try {
     const { puppeteer, chromiumArgs, chromiumDefaultViewport, executablePath } = await getBrowserModules();
@@ -84,49 +84,52 @@ export default async function handler(req, res) {
     //**REPLACE STARTING HERE**
 
     const scrapedData = await page.evaluate((maxArticles) => {
-            const results = [];
-            // Find all elements that represent an article container.
-            // <--- REPLACE THIS SELECTOR with the actual article container selector
-            const articleElements = document.querySelectorAll('div#newslisting > div.col-container');
+        const results = [];
+        // Find all elements that represent an article container.
+        // <--- REPLACE THIS SELECTOR with the actual article container selector
+        const articleElements = document.querySelectorAll('div.view-home-noticias > div.row div.col-md-4 div.news-item');
 
-            if (articleElements.length === 0) {
-                console.warn("DIAGNOSTIC (Inner): No <article> elements found with the specified main selector.");
-                console.warn("DIAGNOSTIC (Inner): Please ensure this selector is correct and the content is loaded on the page.");
-                return [];
-            } else {
-                console.log(`DIAGNOSTIC (Inner): Found ${articleElements.length} potential article elements.`);
-            }
+        if (articleElements.length === 0) {
+            console.warn("DIAGNOSTIC (Inner): No <article> elements found with the specified main selector.");
+            console.warn("DIAGNOSTIC (Inner): Please ensure this selector is correct and the content is loaded on the page.");
+            return [];
+        } else {
+            console.log(`DIAGNOSTIC (Inner): Found ${articleElements.length} potential article elements.`);
+        }
 
-            for (let i = 0; i < Math.min(articleElements.length, maxArticles); i++) {
-                const articleElement = articleElements[i];
+        for (let i = 0; i < Math.min(articleElements.length, maxArticles); i++) {
+            const articleElement = articleElements[i];
+            console.log(`DEBUG: Article element ${i} HTML:`, articleElement.outerHTML.substring(0, 500) + '...');
 
 
-                // Extract Title
-                // <--- REPLACE THIS SELECTOR
-                const titleElement = articleElement.querySelector('div.card > div.card-body > h3 > a');
-                const title = titleElement ? titleElement.innerText.trim() : 'N/A';
-                
-                // Extract Date
-                // <--- REPLACE THIS SELECTOR
-                const dateElement = articleElement.querySelector('div.card > div.card-body > div.dateRow > div.my-1 > span');
-                const date = dateElement ? dateElement.innerText.trim() : 'N/A'
+            // Extract Title
+            // Use robust selector: anchor text may include nested <font> tags
+            const titleElement = articleElement.querySelector('h3 > a');
+            console.log(`DEBUG: Title element found:`, titleElement);
+            const title = titleElement ? titleElement.innerText.trim() : 'N/A';
+            
+            // Extract Date
+            // Use robust selector: the text is on the container regardless of nested tags
+            const dateElement = articleElement.querySelector('span.created');
+            console.log(`DEBUG: Date element found:`, dateElement);
+            const date = dateElement ? dateElement.textContent.replace(/\s+/g, ' ').trim() : 'N/A';
 
-                // Extract Link
-                // <--- REPLACE THIS SELECTOR
-                const linkElement = articleElement.querySelector('div.card > div.card-body > h3 > a');
-                // Use window.location.origin to ensure absolute URLs
-                const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
+            // Extract Link
+            // <--- REPLACE THIS SELECTOR
+            const linkElement = articleElement.querySelector('h3 > a');
+            // Use window.location.origin to ensure absolute URLs
+            const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
 
-                results.push({
-                    title: title,
-                    url: link,
-                    date: date,
-                });
-            }
-            return results;
-        }, maxArticles); // Pass maxArticles to the page.evaluate context
+            results.push({
+                title: title,
+                url: link,
+                date: date,
+            });
+        }
+        return results;
+    }, maxArticles); // Pass maxArticles to the page.evaluate context
 
-        articles.push(...scrapedData);
+    articles.push(...scrapedData);
 
     //**UNTIL HERE**
 

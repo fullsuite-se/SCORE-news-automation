@@ -27,8 +27,8 @@ async function scrapeArticlesWithPuppeteer(url) {
         // Use page.evaluate() to run JavaScript code within the context of the browser page.
         // This is where you'll use the DOM manipulation logic similar to the client-side script.
 
-       const acceptButtonSelector = 'button#userSelect'; // Example: A button with ID 'accept-cookies'
-        const cookieBannerSelector = 'div#cookieApiData'; // Example: The banner div itself
+       const acceptButtonSelector = 'div#cookiescript_accept'; // Example: A button with ID 'accept-cookies'
+        const cookieBannerSelector = 'div#cookiescript_injected'; // Example: The banner div itself
 
         console.log("DIAGNOSTIC (Outer): Checking for cookie consent banner...");
         try {
@@ -71,7 +71,7 @@ async function scrapeArticlesWithPuppeteer(url) {
             const results = [];
             // Find all elements that represent an article container.
             // <--- REPLACE THIS SELECTOR with the actual article container selector
-            const articleElements = document.querySelectorAll('div.ep_gridrow-content > article.ep_gridcolumn');
+            const articleElements = document.querySelectorAll('ul.cards-grid__list > li.news-card');
 
             if (articleElements.length === 0) {
                 console.warn("DIAGNOSTIC (Inner): No <article> elements found with the specified main selector.");
@@ -83,21 +83,24 @@ async function scrapeArticlesWithPuppeteer(url) {
 
             for (let i = 0; i < Math.min(articleElements.length, maxArticles); i++) {
                 const articleElement = articleElements[i];
+                console.log(`DEBUG: Article element ${i} HTML:`, articleElement.outerHTML.substring(0, 500) + '...');
 
 
                 // Extract Title
-                // <--- REPLACE THIS SELECTOR
-                const titleElement = articleElement.querySelector('div.ep_gridcolumn-content h3.ep-a_heading div.ep_title a div.ep-p_text span.ep_name');
+                // Use robust selector: anchor text may include nested <font> tags
+                const titleElement = articleElement.querySelector('h3');
+                console.log(`DEBUG: Title element found:`, titleElement);
                 const title = titleElement ? titleElement.innerText.trim() : 'N/A';
                 
                 // Extract Date
-                // <--- REPLACE THIS SELECTOR
-                const dateElement = articleElement.querySelector('div.ep_gridcolumn-content h3.ep-a_heading div.ep_subtitle time');
+                // Use robust selector: the text is on the container regardless of nested tags
+                const dateElement = articleElement.querySelector('span.news-card__date');
+                console.log(`DEBUG: Date element found:`, dateElement);
                 const date = dateElement ? dateElement.textContent.replace(/\s+/g, ' ').trim() : 'N/A';
 
                 // Extract Link
                 // <--- REPLACE THIS SELECTOR
-                const linkElement = articleElement.querySelector('div.ep_gridcolumn-content h3.ep-a_heading div.ep_title a');
+                const linkElement = articleElement.querySelector('a');
                 // Use window.location.origin to ensure absolute URLs
                 const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
 
@@ -137,7 +140,7 @@ async function scrapeArticlesWithPuppeteer(url) {
 
 // --- Configuration ---
 // <--- REPLACE THIS WITH THE ACTUAL URL OF THE WEBSITE YOU WANT TO SCRAPE
-const targetUrl = 'https://www.europarl.europa.eu/news/en';
+const targetUrl = 'https://en.milieudefensie.nl/news/';
 
 // --- Run the scraper ---
 scrapeArticlesWithPuppeteer(targetUrl)
