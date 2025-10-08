@@ -87,7 +87,7 @@ export default async function handler(req, res) {
         const results = [];
         // Find all elements that represent an article container.
         // <--- REPLACE THIS SELECTOR with the actual article container selector
-        const articleElements = document.querySelectorAll('div.js-view-dom-id-93dd92669d217aa070fa4d6ae3cd40bcc80af5f63d91a2b95d4999b579f7e49c > div');
+        const articleElements = document.querySelectorAll('div.mb-6.pb-6');
 
         if (articleElements.length === 0) {
             console.warn("DIAGNOSTIC (Inner): No <article> elements found with the specified main selector.");

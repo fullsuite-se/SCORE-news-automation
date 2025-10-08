@@ -27,8 +27,8 @@ async function scrapeArticlesWithPuppeteer(url) {
         // Use page.evaluate() to run JavaScript code within the context of the browser page.
         // This is where you'll use the DOM manipulation logic similar to the client-side script.
 
-       const acceptButtonSelector = 'div#cookiescript_accept'; // Example: A button with ID 'accept-cookies'
-        const cookieBannerSelector = 'div#cookiescript_injected'; // Example: The banner div itself
+       const acceptButtonSelector = 'button#onetrust-accept-btn-handler'; // Example: A button with ID 'accept-cookies'
+        const cookieBannerSelector = 'div.ot-sdk-container'; // Example: The banner div itself
 
         console.log("DIAGNOSTIC (Outer): Checking for cookie consent banner...");
         try {
@@ -63,16 +63,16 @@ async function scrapeArticlesWithPuppeteer(url) {
          console.log("DIAGNOSTIC (Outer): Waiting for 'ul.gsc-excerpt-list' to appear...");
         await page.waitForSelector('ul.gsc-excerpt-list', { timeout: 10000 });
         console.log("DIAGNOSTIC (Outer): 'ul.gsc-excerpt-list' found.");
- 
         */
-      
-        // --- NEW ROBUST WAITING STRATEGY: Wait for a minimum number of date-grouping list items ---
-       const scrapedData = await page.evaluate((maxArticles) => {
+
+
+        // --- Extract articles from the HTML structure ---
+        const scrapedData = await page.evaluate((maxArticles) => {
             const results = [];
             // Find all elements that represent an article container.
             // <--- REPLACE THIS SELECTOR with the actual article container selector
-            const articleElements = document.querySelectorAll('ul.cards-grid__list > li.news-card');
-
+            const articleElements = document.querySelectorAll('main#main > article');
+        
             if (articleElements.length === 0) {
                 console.warn("DIAGNOSTIC (Inner): No <article> elements found with the specified main selector.");
                 console.warn("DIAGNOSTIC (Inner): Please ensure this selector is correct and the content is loaded on the page.");
@@ -80,30 +80,27 @@ async function scrapeArticlesWithPuppeteer(url) {
             } else {
                 console.log(`DIAGNOSTIC (Inner): Found ${articleElements.length} potential article elements.`);
             }
-
+        
             for (let i = 0; i < Math.min(articleElements.length, maxArticles); i++) {
                 const articleElement = articleElements[i];
-                console.log(`DEBUG: Article element ${i} HTML:`, articleElement.outerHTML.substring(0, 500) + '...');
-
-
+        
+        
                 // Extract Title
-                // Use robust selector: anchor text may include nested <font> tags
-                const titleElement = articleElement.querySelector('h3');
-                console.log(`DEBUG: Title element found:`, titleElement);
+                // <--- REPLACE THIS SELECTOR
+                const titleElement = articleElement.querySelector('div.content-wrap > header.entry-header > h2 > a');
                 const title = titleElement ? titleElement.innerText.trim() : 'N/A';
                 
                 // Extract Date
-                // Use robust selector: the text is on the container regardless of nested tags
-                const dateElement = articleElement.querySelector('span.news-card__date');
-                console.log(`DEBUG: Date element found:`, dateElement);
+                // <--- REPLACE THIS SELECTOR
+                const dateElement = articleElement.querySelector('div.content-wrap > div.entry-content > p');
                 const date = dateElement ? dateElement.textContent.replace(/\s+/g, ' ').trim() : 'N/A';
-
+        
                 // Extract Link
                 // <--- REPLACE THIS SELECTOR
-                const linkElement = articleElement.querySelector('a');
+                const linkElement = articleElement.querySelector('div.content-wrap > header.entry-header > h2 > a');
                 // Use window.location.origin to ensure absolute URLs
                 const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
-
+        
                 results.push({
                     title: title,
                     url: link,
@@ -112,7 +109,7 @@ async function scrapeArticlesWithPuppeteer(url) {
             }
             return results;
         }, maxArticles); // Pass maxArticles to the page.evaluate context
-
+        
         articles.push(...scrapedData);
 
         console.log("DIAGNOSTIC (Outer): Article data extraction finished.");
@@ -140,7 +137,7 @@ async function scrapeArticlesWithPuppeteer(url) {
 
 // --- Configuration ---
 // <--- REPLACE THIS WITH THE ACTUAL URL OF THE WEBSITE YOU WANT TO SCRAPE
-const targetUrl = 'https://en.milieudefensie.nl/news/';
+const targetUrl = 'https://crudeaccountability.org/category/press-release/';
 
 // --- Run the scraper ---
 scrapeArticlesWithPuppeteer(targetUrl)

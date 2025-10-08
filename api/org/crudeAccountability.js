@@ -39,7 +39,7 @@ async function getBrowserModules() {
 
 export default async function handler(req, res) {
   let browser; 
-  const url = 'https://en.milieudefensie.nl/news/';
+  const url = 'https://crudeaccountability.org/category/press-release/';
 
   try {
     const { puppeteer, chromiumArgs, chromiumDefaultViewport, executablePath } = await getBrowserModules();
@@ -84,50 +84,49 @@ export default async function handler(req, res) {
     //**REPLACE STARTING HERE**
 
     const scrapedData = await page.evaluate((maxArticles) => {
-      const results = [];
-      // Find all elements that represent an article container.
-      // <--- REPLACE THIS SELECTOR with the actual article container selector
-      const articleElements = document.querySelectorAll('div.Blocks > a.link-plain');
-
-      if (articleElements.length === 0) {
-          console.warn("DIAGNOSTIC (Inner): No <article> elements found with the specified main selector.");
-          console.warn("DIAGNOSTIC (Inner): Please ensure this selector is correct and the content is loaded on the page.");
-          return [];
-      } else {
-          console.log(`DIAGNOSTIC (Inner): Found ${articleElements.length} potential article elements.`);
-      }
-
-      for (let i = 0; i < Math.min(articleElements.length, maxArticles); i++) {
-          const articleElement = articleElements[i];
-          console.log(`DEBUG: Article element ${i} HTML:`, articleElement.outerHTML.substring(0, 500) + '...');
-
-
-          // Extract Title
-          // Use robust selector: anchor text may include nested <font> tags
-          const titleElement = articleElement.querySelector('div.BlockPadding > div.BlockIcon-flexItem > h3');
-          console.log(`DEBUG: Title element found:`, titleElement);
-          const title = titleElement ? titleElement.innerText.trim() : 'N/A';
-          
-          // Extract Date
-          // Use robust selector: the text is on the container regardless of nested tags
-          const dateElement = articleElement.querySelector('div.BlockPadding > div.BlockIcon-flexItem > div.BlockIcon-meta > span.BlockIcon-metaDate');
-          console.log(`DEBUG: Date element found:`, dateElement);
-          const date = dateElement ? dateElement.textContent.replace(/\s+/g, ' ').trim() : 'N/A';
-
-          // Extract Link
-          // Since articleElement is already an <a> tag, get href directly
-          const link = articleElement.getAttribute('href') ? new URL(articleElement.getAttribute('href'), window.location.origin).href : 'N/A';
-
-          results.push({
-              title: title,
-              url: link,
-              date: date,
-          });
-      }
-      return results;
-  }, maxArticles); // Pass maxArticles to the page.evaluate context
-
-  articles.push(...scrapedData);
+        const results = [];
+        // Find all elements that represent an article container.
+        // <--- REPLACE THIS SELECTOR with the actual article container selector
+        const articleElements = document.querySelectorAll('main#main > article');
+    
+        if (articleElements.length === 0) {
+            console.warn("DIAGNOSTIC (Inner): No <article> elements found with the specified main selector.");
+            console.warn("DIAGNOSTIC (Inner): Please ensure this selector is correct and the content is loaded on the page.");
+            return [];
+        } else {
+            console.log(`DIAGNOSTIC (Inner): Found ${articleElements.length} potential article elements.`);
+        }
+    
+        for (let i = 0; i < Math.min(articleElements.length, maxArticles); i++) {
+            const articleElement = articleElements[i];
+    
+    
+            // Extract Title
+            // <--- REPLACE THIS SELECTOR
+            const titleElement = articleElement.querySelector('div.content-wrap > header.entry-header > h2 > a');
+            const title = titleElement ? titleElement.innerText.trim() : 'N/A';
+            
+            // Extract Date
+            // <--- REPLACE THIS SELECTOR
+            const dateElement = articleElement.querySelector('div.content-wrap > div.entry-content > p');
+            const date = dateElement ? dateElement.textContent.replace(/\s+/g, ' ').trim() : 'N/A';
+    
+            // Extract Link
+            // <--- REPLACE THIS SELECTOR
+            const linkElement = articleElement.querySelector('div.content-wrap > header.entry-header > h2 > a');
+            // Use window.location.origin to ensure absolute URLs
+            const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
+    
+            results.push({
+                title: title,
+                url: link,
+                date: date,
+            });
+        }
+        return results;
+    }, maxArticles); // Pass maxArticles to the page.evaluate context
+    
+    articles.push(...scrapedData);
 
     //**UNTIL HERE**
 
