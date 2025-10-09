@@ -71,36 +71,34 @@ async function scrapeArticlesWithPuppeteer(url) {
             const results = [];
             // Find all elements that represent an article container.
             // <--- REPLACE THIS SELECTOR with the actual article container selector
-            const articleElements = document.querySelectorAll('main#main > article');
-        
+            // const articleElements = document.querySelectorAll('ul > li');
+            const articleElements = document.querySelectorAll('tbody > tr');
+
             if (articleElements.length === 0) {
-                console.warn("DIAGNOSTIC (Inner): No <article> elements found with the specified main selector.");
-                console.warn("DIAGNOSTIC (Inner): Please ensure this selector is correct and the content is loaded on the page.");
+                console.warn("No article container elements found with the provided selector. Please check your selector.");
                 return [];
-            } else {
-                console.log(`DIAGNOSTIC (Inner): Found ${articleElements.length} potential article elements.`);
             }
-        
+
             for (let i = 0; i < Math.min(articleElements.length, maxArticles); i++) {
                 const articleElement = articleElements[i];
-        
-        
+
                 // Extract Title
                 // <--- REPLACE THIS SELECTOR
-                const titleElement = articleElement.querySelector('div.content-wrap > header.entry-header > h2 > a');
+                const titleElement = articleElement.querySelector('a');
                 const title = titleElement ? titleElement.innerText.trim() : 'N/A';
-                
+
                 // Extract Date
                 // <--- REPLACE THIS SELECTOR
-                const dateElement = articleElement.querySelector('div.content-wrap > div.entry-content > p');
-                const date = dateElement ? dateElement.textContent.replace(/\s+/g, ' ').trim() : 'N/A';
-        
+                const dateElement = articleElement.querySelector('p.board_date');
+                const date = dateElement ? dateElement.innerText.trim() : 'N/A'
+                // const date = dateElement ? dateElement.getAttribute('datetime') : 'N/A'
+
                 // Extract Link
                 // <--- REPLACE THIS SELECTOR
-                const linkElement = articleElement.querySelector('div.content-wrap > header.entry-header > h2 > a');
+                const linkElement = articleElement.querySelector('a');
                 // Use window.location.origin to ensure absolute URLs
                 const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
-        
+
                 results.push({
                     title: title,
                     url: link,
@@ -109,7 +107,7 @@ async function scrapeArticlesWithPuppeteer(url) {
             }
             return results;
         }, maxArticles); // Pass maxArticles to the page.evaluate context
-        
+
         articles.push(...scrapedData);
 
         console.log("DIAGNOSTIC (Outer): Article data extraction finished.");
@@ -137,7 +135,7 @@ async function scrapeArticlesWithPuppeteer(url) {
 
 // --- Configuration ---
 // <--- REPLACE THIS WITH THE ACTUAL URL OF THE WEBSITE YOU WANT TO SCRAPE
-const targetUrl = 'https://crudeaccountability.org/category/press-release/';
+const targetUrl = 'https://eng.kasb.or.kr/en/front/board/engAnnouncementsList.do?seq=&searchfield=ALL&searchword=sustainability&s_date_start=&s_date_end=';
 
 // --- Run the scraper ---
 scrapeArticlesWithPuppeteer(targetUrl)

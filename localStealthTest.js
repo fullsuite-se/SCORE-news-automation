@@ -37,45 +37,62 @@ async function scrapeArticlesWithPuppeteer(url) {
 
 
         // Navigate to the specified URL.
-        await page.goto(url, { waitUntil: 'domcontentloaded' }); // Wait until the DOM is loaded
+        await page.goto(url, { waitUntil: 'networkidle2' });
+
+        // Handle cookie consent (OneTrust) similar to non-stealth script
+        const acceptButtonSelector = 'button#onetrust-accept-btn-handler';
+        const cookieBannerSelector = 'div.ot-sdk-container';
+        try {
+            await page.waitForSelector(acceptButtonSelector, { visible: true, timeout: 5000 });
+            await page.click(acceptButtonSelector);
+            await page.waitForSelector(cookieBannerSelector, { hidden: true, timeout: 5000 });
+            // Reload after accepting cookies to ensure content loads
+            await page.reload({ waitUntil: 'networkidle2' });
+        } catch (_) {
+            // No cookie banner or it disappeared; continue
+        }
+
+        // Wait for the container and ensure results are populated (site loads via JS)
+        await page.waitForSelector('div.widget-filter-listing-results', { timeout: 15000 });
+        await page.waitForFunction(() => {
+            const container = document.querySelector('div.widget-filter-listing-results');
+            return !!container && container.querySelectorAll('div.article-list-result').length > 0;
+        }, { timeout: 20000 });
 
         // Optional: Wait for specific elements to appear if content loads dynamically
         // await page.waitForSelector('.article-container-selector', { timeout: 5000 });
 
         // Use page.evaluate() to run JavaScript code within the context of the browser page.
         // This is where you'll use the DOM manipulation logic similar to the client-side script.
-       const scrapedData = await page.evaluate((maxArticles) => {
+        const scrapedData = await page.evaluate((maxArticles) => {
             const results = [];
             // Find all elements that represent an article container.
             // <--- REPLACE THIS SELECTOR with the actual article container selector
-            const articleElements = document.querySelectorAll('div#NewsListingAllListing2 > div.row > div');
+            // const articleElements = document.querySelectorAll('ul > li');
+            const articleElements = document.querySelectorAll('div.widget-filter-listing-results > div.article-list-result');
 
             if (articleElements.length === 0) {
-                console.warn("DIAGNOSTIC (Inner): No <article> elements found with the specified main selector.");
-                console.warn("DIAGNOSTIC (Inner): Please ensure this selector is correct and the content is loaded on the page.");
+                console.warn("No article container elements found with the provided selector. Please check your selector.");
                 return [];
-            } else {
-                console.log(`DIAGNOSTIC (Inner): Found ${articleElements.length} potential article elements.`);
             }
 
             for (let i = 0; i < Math.min(articleElements.length, maxArticles); i++) {
                 const articleElement = articleElements[i];
 
-
                 // Extract Title
                 // <--- REPLACE THIS SELECTOR
-                const titleElement = articleElement.querySelector('div.media-item > div.media-content > h3');
-                // const title = titleElement ? titleElement.innerText.trim() : 'N/A';
-                const title = titleElement ? titleElement.getAttribute('title') : 'N/A';
+                const titleElement = articleElement.querySelector('a');
+                const title = titleElement ? titleElement.innerText.trim() : 'N/A';
 
                 // Extract Date
                 // <--- REPLACE THIS SELECTOR
-                const dateElement = articleElement.querySelector('div.media-item > div.media-content > span.date');
+                const dateElement = articleElement.querySelector('div.timestamp');
                 const date = dateElement ? dateElement.innerText.trim() : 'N/A'
+                // const date = dateElement ? dateElement.getAttribute('datetime') : 'N/A'
 
                 // Extract Link
                 // <--- REPLACE THIS SELECTOR
-                const linkElement = articleElement.querySelector('div.media-item > div.media-content > a');
+                const linkElement = articleElement.querySelector('a');
                 // Use window.location.origin to ensure absolute URLs
                 const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
 
@@ -114,7 +131,7 @@ async function scrapeArticlesWithPuppeteer(url) {
 
 // --- Configuration ---
 // <--- REPLACE THIS WITH THE ACTUAL URL OF THE WEBSITE YOU WANT TO SCRAPE
-const targetUrl = 'https://www.mecc.gov.qa/English/About/Pages/News.aspx';
+const targetUrl = 'https://www.sgxgroup.com/media-centre?value=sustainability';
 
 // --- Run the scraper ---
 scrapeArticlesWithPuppeteer(targetUrl)
