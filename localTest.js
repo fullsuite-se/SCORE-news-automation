@@ -71,8 +71,7 @@ async function scrapeArticlesWithPuppeteer(url) {
             const results = [];
             // Find all elements that represent an article container.
             // <--- REPLACE THIS SELECTOR with the actual article container selector
-            // const articleElements = document.querySelectorAll('ul > li');
-            const articleElements = document.querySelectorAll('tbody > tr');
+            const articleElements = document.querySelectorAll('div.container > div.row.mt-4 > div');
 
             if (articleElements.length === 0) {
                 console.warn("No article container elements found with the provided selector. Please check your selector.");
@@ -84,18 +83,17 @@ async function scrapeArticlesWithPuppeteer(url) {
 
                 // Extract Title
                 // <--- REPLACE THIS SELECTOR
-                const titleElement = articleElement.querySelector('a');
+                const titleElement = articleElement.querySelector('h4.card-title');
                 const title = titleElement ? titleElement.innerText.trim() : 'N/A';
 
                 // Extract Date
                 // <--- REPLACE THIS SELECTOR
-                const dateElement = articleElement.querySelector('p.board_date');
+                const dateElement = articleElement.querySelector('div.content-row > div.card-meta-items > div.font-italic');
                 const date = dateElement ? dateElement.innerText.trim() : 'N/A'
-                // const date = dateElement ? dateElement.getAttribute('datetime') : 'N/A'
 
                 // Extract Link
                 // <--- REPLACE THIS SELECTOR
-                const linkElement = articleElement.querySelector('a');
+                const linkElement = articleElement.querySelector('div.action-row > a');
                 // Use window.location.origin to ensure absolute URLs
                 const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
 
@@ -135,7 +133,7 @@ async function scrapeArticlesWithPuppeteer(url) {
 
 // --- Configuration ---
 // <--- REPLACE THIS WITH THE ACTUAL URL OF THE WEBSITE YOU WANT TO SCRAPE
-const targetUrl = 'https://eng.kasb.or.kr/en/front/board/engAnnouncementsList.do?seq=&searchfield=ALL&searchword=sustainability&s_date_start=&s_date_end=';
+const targetUrl = 'https://ktncwatch.org/news/';
 
 // --- Run the scraper ---
 scrapeArticlesWithPuppeteer(targetUrl)
