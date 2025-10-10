@@ -1,150 +1,155 @@
-
 const isVercelEnvironment = !!process.env.AWS_REGION;
 
 async function getBrowserModules() {
-  if (isVercelEnvironment) {
-    const puppeteer = (await import('puppeteer-core')).default;
-    const { default: ChromiumClass } = await import('@sparticuz/chromium');
+  await import('puppeteer-extra-plugin-stealth/evasions/chrome.app/index.js');
+  await import('puppeteer-extra-plugin-stealth/evasions/chrome.csi/index.js');
+  await import('puppeteer-extra-plugin-stealth/evasions/chrome.loadTimes/index.js');
+  await import('puppeteer-extra-plugin-stealth/evasions/chrome.runtime/index.js');
+  await import('puppeteer-extra-plugin-stealth/evasions/defaultArgs/index.js');
+  await import('puppeteer-extra-plugin-stealth/evasions/iframe.contentWindow/index.js');
+  await import('puppeteer-extra-plugin-stealth/evasions/media.codecs/index.js');
+  await import('puppeteer-extra-plugin-stealth/evasions/navigator.hardwareConcurrency/index.js');
+  await import('puppeteer-extra-plugin-stealth/evasions/navigator.languages/index.js');
+  await import('puppeteer-extra-plugin-stealth/evasions/navigator.permissions/index.js');
+  await import('puppeteer-extra-plugin-stealth/evasions/navigator.plugins/index.js');
+  await import('puppeteer-extra-plugin-stealth/evasions/navigator.vendor/index.js');
+  await import('puppeteer-extra-plugin-stealth/evasions/navigator.webdriver/index.js');
+  await import('puppeteer-extra-plugin-stealth/evasions/sourceurl/index.js');
+  await import('puppeteer-extra-plugin-stealth/evasions/user-agent-override/index.js');
+  await import('puppeteer-extra-plugin-stealth/evasions/webgl.vendor/index.js');
+  await import('puppeteer-extra-plugin-stealth/evasions/window.outerdimensions/index.js');
 
-    console.log('--- Debugging ChromiumClass object (Vercel Environment) ---');
-    console.log('Type of ChromiumClass:', typeof ChromiumClass);
-    console.log('ChromiumClass.executablePath is a function:', typeof ChromiumClass.executablePath === 'function');
-    console.log('ChromiumClass.args:', ChromiumClass.args);
-    console.log('ChromiumClass.defaultViewport:', ChromiumClass.defaultViewport);
-    console.log('--- End ChromiumClass Debug (Vercel Environment) ---');
+  const puppeteer = (await import('puppeteer-extra')).default;
+  // stealth plugin to hide puppeteer
+  const StealthPlugin = (await import('puppeteer-extra-plugin-stealth')).default;
+  puppeteer.use(StealthPlugin());
 
-    let executablePathValue = null;
-    if (typeof ChromiumClass.executablePath === 'function') {
-      executablePathValue = await ChromiumClass.executablePath();
-    } else {
-      executablePathValue = ChromiumClass.executablePath;
-    }
-
-    return {
-      puppeteer,
-      chromiumArgs: ChromiumClass.args,
-      chromiumDefaultViewport: ChromiumClass.defaultViewport,
-      executablePath: executablePathValue
-    };
+  const UserPreferencesPlugin = (await import('puppeteer-extra-plugin-user-preferences')).default;
+  puppeteer.use(UserPreferencesPlugin());
+  const UserDataDirPlugin = (await import('puppeteer-extra-plugin-user-data-dir')).default;
+  puppeteer.use(UserDataDirPlugin());
+  
+  const { default: ChromiumClass } = await import('@sparticuz/chromium');
+  console.log('--- Debugging ChromiumClass object (Vercel) ---');
+  console.log('Type of ChromiumClass:', typeof ChromiumClass);
+  console.log('Keys of ChromiumClass:', Object.keys(ChromiumClass));
+  console.log('Full ChromiumClass object:', ChromiumClass);
+  console.log('ChromiumClass.executablePath is a function:', typeof ChromiumClass.executablePath === 'function');
+  console.log('ChromiumClass.args:', ChromiumClass.args);
+  console.log('ChromiumClass.defaultViewport:', ChromiumClass.defaultViewport);
+  console.log('--- End ChromiumClass Debug (Vercel) ---');
+  let executablePathValue = null;
+  if (typeof ChromiumClass.executablePath === 'function') {
+    executablePathValue = await ChromiumClass.executablePath();
+    // executablePathValue = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
   } else {
-    const puppeteer = (await import('puppeteer')).default;
-    return {
-      puppeteer,
-      chromiumArgs: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'], 
-      chromiumDefaultViewport: null, 
-      executablePath: undefined 
-    };
+    executablePathValue = ChromiumClass.executablePath;
+    // executablePathValue = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
   }
+  console.log('EXECUTABLE PATH VALUE: ', executablePathValue);
+  return {
+    puppeteer,
+    chromiumArgs: ChromiumClass.args,
+    chromiumDefaultViewport: ChromiumClass.defaultViewport,
+    executablePath: executablePathValue
+  };
 }
+export default async function (req, res) {
+  const { puppeteer, chromiumArgs, chromiumDefaultViewport, executablePath } = await getBrowserModules();
+  console.log('--- Puppeteer Launch Debug Info (Vercel) ---');
+  console.log('isVercelEnvironment:', isVercelEnvironment);
+  console.log('chromiumArgs (from @sparticuz/chromium):', chromiumArgs);
+  console.log('chromiumDefaultViewport (from @sparticuz/chromium):', chromiumDefaultViewport);
+  console.log('Executable Path (from @sparticuz/chromium):', executablePath);
+  console.log('--- End Debug Info (Vercel) ---');
+  if (isVercelEnvironment && (!executablePath || typeof executablePath !== 'string' || executablePath.trim() === '')) {
+    console.error('ERROR: In Vercel environment, executablePath is not valid:', executablePath);
+    return res.status(500).json({
+      error: 'Puppeteer launch failed: Missing or invalid Chromium executable path for Vercel environment.'
+    });
+  }
+  const launchOptions = isVercelEnvironment
+    ? {
+        args: chromiumArgs,
+        defaultViewport: chromiumDefaultViewport,
+        executablePath: executablePath,
+        headless: "new", // Must be true for serverless environments
+      }
+    : {
+        headless: "new", // Set to true for consistency, or false for local visual debugging
+        defaultViewport: null,
+        slowMo: 50,
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
+        executablePath: executablePath,
+      };
+  let browser;
 
-export default async function handler(req, res) {
-  let browser; 
-  const url = 'https://www.acra.gov.sg/news-events?categoryid=a04199eb-15f7-43fd-a89f-b7aaca3a8af5';
-
+  const url = `https://www.acra.gov.sg/news-events?categoryid=a04199eb-15f7-43fd-a89f-b7aaca3a8af5`
+  const articles = [];
+  const maxArticles = 10;
   try {
-    const { puppeteer, chromiumArgs, chromiumDefaultViewport, executablePath } = await getBrowserModules();
-
-    console.log('--- Puppeteer Launch Debug Info ---');
-    console.log('Is Vercel Environment:', isVercelEnvironment);
-    console.log('Chromium Args:', chromiumArgs);
-    console.log('Chromium Default Viewport:', chromiumDefaultViewport);
-    console.log('Executable Path:', executablePath);
-    console.log('--- End Debug Info ---');
-
-    if (isVercelEnvironment && (!executablePath || typeof executablePath !== 'string' || executablePath.trim() === '')) {
-      console.error('ERROR: In Vercel environment, executablePath is not valid:', executablePath);
-      return res.status(500).json({
-        error: 'Puppeteer launch failed: Missing or invalid Chromium executable path for Vercel environment.'
-      });
-    }
-
-    const launchOptions = isVercelEnvironment
-      ? {
-          args: chromiumArgs,           
-          defaultViewport: chromiumDefaultViewport, 
-          executablePath: executablePath, 
-          headless: true,               
-        }
-      : {
-          headless: true,               
-          defaultViewport: null,        
-          args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'], 
-        };
-
     console.log('Attempting to launch Puppeteer with options:', JSON.stringify(launchOptions, null, 2));
-
     browser = await puppeteer.launch(launchOptions);
     const page = await browser.newPage();
-    const articles = [];
-    const maxArticles = 10;
-
-    console.log(`Navigating to ${url}...`);
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    
+   
     //**REPLACE STARTING HERE**
-
+    
     const scrapedData = await page.evaluate((maxArticles) => {
-        const results = [];
-        // Find all elements that represent an article container.
-        // <--- REPLACE THIS SELECTOR with the actual article container selector
-        // const articleElements = document.querySelectorAll('ul > li');
-        const articleElements = document.querySelectorAll('div#newsListsmartList > div.row');
+      const results = [];
+      // Find all elements that represent an article container.
+      // <--- REPLACE THIS SELECTOR with the actual article container selector
+      // const articleElements = document.querySelectorAll('ul > li');
+      const articleElements = document.querySelectorAll('div#newsListsmartList > div.row');
 
-        if (articleElements.length === 0) {
-            console.warn("No article container elements found with the provided selector. Please check your selector.");
-            return [];
-        }
+      if (articleElements.length === 0) {
+          console.warn("No article container elements found with the provided selector. Please check your selector.");
+          return [];
+      }
 
-        for (let i = 0; i < Math.min(articleElements.length, maxArticles); i++) {
-            const articleElement = articleElements[i];
+      for (let i = 0; i < Math.min(articleElements.length, maxArticles); i++) {
+          const articleElement = articleElements[i];
 
-            // Extract Title
-            // <--- REPLACE THIS SELECTOR
-            const titleElement = articleElement.querySelector('a');
-            const title = titleElement ? titleElement.innerText.trim() : 'N/A';
+          // Extract Title
+          // <--- REPLACE THIS SELECTOR
+          const titleElement = articleElement.querySelector('a');
+          const title = titleElement ? titleElement.innerText.trim() : 'N/A';
 
-            // Extract Date
-            // <--- REPLACE THIS SELECTOR
-            const dateElement = articleElement.querySelector('div.date');
-            const date = dateElement ? dateElement.innerText.trim() : 'N/A'
-            // const date = dateElement ? dateElement.getAttribute('datetime') : 'N/A'
+          // Extract Date
+          // <--- REPLACE THIS SELECTOR
+          const dateElement = articleElement.querySelector('div.date');
+          const date = dateElement ? dateElement.innerText.trim() : 'N/A'
+          // const date = dateElement ? dateElement.getAttribute('datetime') : 'N/A'
 
-            // Extract Link
-            // <--- REPLACE THIS SELECTOR
-            const linkElement = articleElement.querySelector('a');
-            // Use window.location.origin to ensure absolute URLs
-            const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
+          // Extract Link
+          // <--- REPLACE THIS SELECTOR
+          const linkElement = articleElement.querySelector('a');
+          // Use window.location.origin to ensure absolute URLs
+          const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
 
-            results.push({
-                title: title,
-                url: link,
-                date: date,
-            });
-        }
-        return results;
-    }, maxArticles); // Pass maxArticles to the page.evaluate context
+          results.push({
+              title: title,
+              url: link,
+              date: date,
+          });
+      }
+      return results;
+  }, maxArticles); // Pass maxArticles to the page.evaluate context
 
-    articles.push(...scrapedData);
+  articles.push(...scrapedData);
     //**UNTIL HERE**
-
+        
     if (articles.length === 0) {
-      console.log('No articles found.');
-      return res.status(200).json({
-        message: 'No articles found with the specified selectors.',
-      });
-    } else {
-      console.log(`Successfully scraped ${articles.length} articles.`);
-      return res.status(200).json(articles);
+      console.log('No articles found!');
+      return res.status(200).json({ message: 'No articles found' });
     }
-
+    console.log(`Returning ${articles.length} articles.`);
+    res.status(200).json(articles);
   } catch (err) {
-    console.error('Error during scraping:', err);
-    return res.status(500).json({
-      details: err.message || 'An unknown error occurred during scraping.'
-    });
+    console.error('Error during scraping:', err.message);
+    res.status(500).json({ error: 'Scraping failed', details: err.message });
   } finally {
     if (browser) {
-      console.log('Closing browser...');
       await browser.close();
     }
   }

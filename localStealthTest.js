@@ -53,10 +53,10 @@ async function scrapeArticlesWithPuppeteer(url) {
         }
 
         // Wait for the container and ensure results are populated (site loads via JS)
-        await page.waitForSelector('div.widget-filter-listing-results', { timeout: 15000 });
+        await page.waitForSelector('div.view-content', { timeout: 15000 });
         await page.waitForFunction(() => {
-            const container = document.querySelector('div.widget-filter-listing-results');
-            return !!container && container.querySelectorAll('div.article-list-result').length > 0;
+            const container = document.querySelector('div.view-content');
+            return !!container && container.querySelectorAll('div.views-row').length > 0;
         }, { timeout: 20000 });
 
         // Optional: Wait for specific elements to appear if content loads dynamically
@@ -69,33 +69,33 @@ async function scrapeArticlesWithPuppeteer(url) {
             // Find all elements that represent an article container.
             // <--- REPLACE THIS SELECTOR with the actual article container selector
             // const articleElements = document.querySelectorAll('ul > li');
-            const articleElements = document.querySelectorAll('div.widget-filter-listing-results > div.article-list-result');
-
+            const articleElements = document.querySelectorAll('div.view-content > div.views-row');
+    
             if (articleElements.length === 0) {
                 console.warn("No article container elements found with the provided selector. Please check your selector.");
                 return [];
             }
-
+    
             for (let i = 0; i < Math.min(articleElements.length, maxArticles); i++) {
                 const articleElement = articleElements[i];
-
+    
                 // Extract Title
                 // <--- REPLACE THIS SELECTOR
-                const titleElement = articleElement.querySelector('a');
+                const titleElement = articleElement.querySelector('h3.title > a');
                 const title = titleElement ? titleElement.innerText.trim() : 'N/A';
-
+    
                 // Extract Date
                 // <--- REPLACE THIS SELECTOR
-                const dateElement = articleElement.querySelector('div.timestamp');
+                const dateElement = articleElement.querySelector('time');
                 const date = dateElement ? dateElement.innerText.trim() : 'N/A'
                 // const date = dateElement ? dateElement.getAttribute('datetime') : 'N/A'
-
+    
                 // Extract Link
                 // <--- REPLACE THIS SELECTOR
-                const linkElement = articleElement.querySelector('a');
+                const linkElement = articleElement.querySelector('h3.title > a');
                 // Use window.location.origin to ensure absolute URLs
                 const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
-
+    
                 results.push({
                     title: title,
                     url: link,
@@ -104,7 +104,7 @@ async function scrapeArticlesWithPuppeteer(url) {
             }
             return results;
         }, maxArticles); // Pass maxArticles to the page.evaluate context
-
+    
         articles.push(...scrapedData);
 
         console.log(`Successfully scraped ${articles.length} articles:`);
@@ -131,7 +131,7 @@ async function scrapeArticlesWithPuppeteer(url) {
 
 // --- Configuration ---
 // <--- REPLACE THIS WITH THE ACTUAL URL OF THE WEBSITE YOU WANT TO SCRAPE
-const targetUrl = 'https://www.sgxgroup.com/media-centre?value=sustainability';
+const targetUrl = 'https://www.exchange.jo/en/announcements?category=9';
 
 // --- Run the scraper ---
 scrapeArticlesWithPuppeteer(targetUrl)

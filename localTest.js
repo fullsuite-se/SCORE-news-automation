@@ -71,32 +71,34 @@ async function scrapeArticlesWithPuppeteer(url) {
             const results = [];
             // Find all elements that represent an article container.
             // <--- REPLACE THIS SELECTOR with the actual article container selector
-            const articleElements = document.querySelectorAll('div.container > div.row.mt-4 > div');
-
+            // const articleElements = document.querySelectorAll('ul > li');
+            const articleElements = document.querySelectorAll('div.row > div.col-12 > div.news-box');
+    
             if (articleElements.length === 0) {
                 console.warn("No article container elements found with the provided selector. Please check your selector.");
                 return [];
             }
-
+    
             for (let i = 0; i < Math.min(articleElements.length, maxArticles); i++) {
                 const articleElement = articleElements[i];
-
+    
                 // Extract Title
                 // <--- REPLACE THIS SELECTOR
-                const titleElement = articleElement.querySelector('h4.card-title');
+                const titleElement = articleElement.querySelector('h5 > a');
                 const title = titleElement ? titleElement.innerText.trim() : 'N/A';
-
+    
                 // Extract Date
                 // <--- REPLACE THIS SELECTOR
-                const dateElement = articleElement.querySelector('div.content-row > div.card-meta-items > div.font-italic');
+                const dateElement = articleElement.querySelector('p.news-date');
                 const date = dateElement ? dateElement.innerText.trim() : 'N/A'
-
+                // const date = dateElement ? dateElement.getAttribute('datetime') : 'N/A'
+    
                 // Extract Link
                 // <--- REPLACE THIS SELECTOR
-                const linkElement = articleElement.querySelector('div.action-row > a');
+                const linkElement = articleElement.querySelector('a');
                 // Use window.location.origin to ensure absolute URLs
                 const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
-
+    
                 results.push({
                     title: title,
                     url: link,
@@ -105,7 +107,7 @@ async function scrapeArticlesWithPuppeteer(url) {
             }
             return results;
         }, maxArticles); // Pass maxArticles to the page.evaluate context
-
+    
         articles.push(...scrapedData);
 
         console.log("DIAGNOSTIC (Outer): Article data extraction finished.");
@@ -133,7 +135,7 @@ async function scrapeArticlesWithPuppeteer(url) {
 
 // --- Configuration ---
 // <--- REPLACE THIS WITH THE ACTUAL URL OF THE WEBSITE YOU WANT TO SCRAPE
-const targetUrl = 'https://ktncwatch.org/news/';
+const targetUrl = 'https://socpa.org.sa/Socpa/Media-Center/News.aspx';
 
 // --- Run the scraper ---
 scrapeArticlesWithPuppeteer(targetUrl)
