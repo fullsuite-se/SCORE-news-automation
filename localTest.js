@@ -12,7 +12,7 @@ async function scrapeArticlesWithPuppeteer(url) {
         // Launch a headless browser instance.
         // `headless: true` runs Chrome without a visible UI.
         // Set to `headless: false` if you want to see the browser automation.
-        browser = await puppeteer.launch({ headless: true });
+        browser = await puppeteer.launch({ headless: false });
         const page = await browser.newPage();
 
         // Set a default timeout for navigation (e.g., 60 seconds)
@@ -72,7 +72,7 @@ async function scrapeArticlesWithPuppeteer(url) {
             // Find all elements that represent an article container.
             // <--- REPLACE THIS SELECTOR with the actual article container selector
             // const articleElements = document.querySelectorAll('ul > li');
-            const articleElements = document.querySelectorAll('div.row > div.col-12 > div.news-box');
+            const articleElements = document.querySelectorAll('p#sustainability-announcements-list > div.sustainability-announcement-item-bar');
     
             if (articleElements.length === 0) {
                 console.warn("No article container elements found with the provided selector. Please check your selector.");
@@ -84,14 +84,27 @@ async function scrapeArticlesWithPuppeteer(url) {
     
                 // Extract Title
                 // <--- REPLACE THIS SELECTOR
-                const titleElement = articleElement.querySelector('h5 > a');
+                const titleElement = articleElement.querySelector('a');
                 const title = titleElement ? titleElement.innerText.trim() : 'N/A';
     
-                // Extract Date
+                // Extract Date from separate day, month, year elements
                 // <--- REPLACE THIS SELECTOR
-                const dateElement = articleElement.querySelector('p.news-date');
-                const date = dateElement ? dateElement.innerText.trim() : 'N/A'
-                // const date = dateElement ? dateElement.getAttribute('datetime') : 'N/A'
+                const dateContainer = articleElement.querySelector('.sustainability-announcement-item-date');
+                let date = 'N/A';
+                
+                if (dateContainer) {
+                    const dayElement = dateContainer.querySelector('.sustainability-announcement-item-date-day');
+                    const monthElement = dateContainer.querySelector('.sustainability-announcement-item-date-month');
+                    const yearElement = dateContainer.querySelector('.sustainability-announcement-item-date-year');
+                    
+                    const day = dayElement ? dayElement.innerText.trim() : '';
+                    const month = monthElement ? monthElement.innerText.trim() : '';
+                    const year = yearElement ? yearElement.innerText.trim() : '';
+                    
+                    if (day && month && year) {
+                        date = `${day} ${month} ${year}`;
+                    }
+                }
     
                 // Extract Link
                 // <--- REPLACE THIS SELECTOR
@@ -135,7 +148,7 @@ async function scrapeArticlesWithPuppeteer(url) {
 
 // --- Configuration ---
 // <--- REPLACE THIS WITH THE ACTUAL URL OF THE WEBSITE YOU WANT TO SCRAPE
-const targetUrl = 'https://socpa.org.sa/Socpa/Media-Center/News.aspx';
+const targetUrl = 'https://www.kgk.gov.tr/surdurulebilirlik-duyurular';
 
 // --- Run the scraper ---
 scrapeArticlesWithPuppeteer(targetUrl)

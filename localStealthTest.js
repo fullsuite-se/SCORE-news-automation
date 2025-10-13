@@ -53,10 +53,10 @@ async function scrapeArticlesWithPuppeteer(url) {
         }
 
         // Wait for the container and ensure results are populated (site loads via JS)
-        await page.waitForSelector('div.view-content', { timeout: 15000 });
+        await page.waitForSelector('p#sustainability-announcements-list', { timeout: 15000 });
         await page.waitForFunction(() => {
-            const container = document.querySelector('div.view-content');
-            return !!container && container.querySelectorAll('div.views-row').length > 0;
+            const container = document.querySelector('p#sustainability-announcements-list');
+            return !!container && container.querySelectorAll('div.sustainability-announcement-item-bar').length > 0;
         }, { timeout: 20000 });
 
         // Optional: Wait for specific elements to appear if content loads dynamically
@@ -69,7 +69,7 @@ async function scrapeArticlesWithPuppeteer(url) {
             // Find all elements that represent an article container.
             // <--- REPLACE THIS SELECTOR with the actual article container selector
             // const articleElements = document.querySelectorAll('ul > li');
-            const articleElements = document.querySelectorAll('div.view-content > div.views-row');
+            const articleElements = document.querySelectorAll('p#sustainability-announcements-list > div.sustainability-announcement-item-bar');
     
             if (articleElements.length === 0) {
                 console.warn("No article container elements found with the provided selector. Please check your selector.");
@@ -81,18 +81,31 @@ async function scrapeArticlesWithPuppeteer(url) {
     
                 // Extract Title
                 // <--- REPLACE THIS SELECTOR
-                const titleElement = articleElement.querySelector('h3.title > a');
+                const titleElement = articleElement.querySelector('a');
                 const title = titleElement ? titleElement.innerText.trim() : 'N/A';
     
-                // Extract Date
+                // Extract Date from separate day, month, year elements
                 // <--- REPLACE THIS SELECTOR
-                const dateElement = articleElement.querySelector('time');
-                const date = dateElement ? dateElement.innerText.trim() : 'N/A'
-                // const date = dateElement ? dateElement.getAttribute('datetime') : 'N/A'
+                const dateContainer = articleElement.querySelector('.sustainability-announcement-item-date');
+                let date = 'N/A';
+                
+                if (dateContainer) {
+                    const dayElement = dateContainer.querySelector('.sustainability-announcement-item-date-day');
+                    const monthElement = dateContainer.querySelector('.sustainability-announcement-item-date-month');
+                    const yearElement = dateContainer.querySelector('.sustainability-announcement-item-date-year');
+                    
+                    const day = dayElement ? dayElement.innerText.trim() : '';
+                    const month = monthElement ? monthElement.innerText.trim() : '';
+                    const year = yearElement ? yearElement.innerText.trim() : '';
+                    
+                    if (day && month && year) {
+                        date = `${day} ${month} ${year}`;
+                    }
+                }
     
                 // Extract Link
                 // <--- REPLACE THIS SELECTOR
-                const linkElement = articleElement.querySelector('h3.title > a');
+                const linkElement = articleElement.querySelector('a');
                 // Use window.location.origin to ensure absolute URLs
                 const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
     
@@ -131,7 +144,7 @@ async function scrapeArticlesWithPuppeteer(url) {
 
 // --- Configuration ---
 // <--- REPLACE THIS WITH THE ACTUAL URL OF THE WEBSITE YOU WANT TO SCRAPE
-const targetUrl = 'https://www.exchange.jo/en/announcements?category=9';
+const targetUrl = 'https://www.kgk.gov.tr/surdurulebilirlik-duyurular';
 
 // --- Run the scraper ---
 scrapeArticlesWithPuppeteer(targetUrl)
