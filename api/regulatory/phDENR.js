@@ -148,7 +148,7 @@ export default async function (req, res) {
     console.log('Navigating to URL:', url);
     
     // Add a small delay to make it look more human-like
-    await page.waitForTimeout(Math.random() * 2000 + 1000); // 1-3 second random delay
+    await new Promise(resolve => setTimeout(resolve, Math.random() * 2000 + 1000)); // 1-3 second random delay
     
     // Try different wait strategies for serverless environment
     try {
@@ -168,7 +168,7 @@ export default async function (req, res) {
             });
             console.log('Page loaded with domcontentloaded');
             // Wait a bit more for dynamic content
-            await page.waitForTimeout(5000);
+            await new Promise(resolve => setTimeout(resolve, 5000));
         } catch (error2) {
             console.log('domcontentloaded failed, trying load:', error2.message);
             await page.goto(url, { 
@@ -178,7 +178,7 @@ export default async function (req, res) {
             });
             console.log('Page loaded with load');
             // Wait more for dynamic content
-            await page.waitForTimeout(10000);
+            await new Promise(resolve => setTimeout(resolve, 10000));
         }
     }
     
@@ -204,7 +204,7 @@ export default async function (req, res) {
         try {
             console.log('Trying to access main site first...');
             await page.goto('https://denr.gov.ph/', { waitUntil: 'domcontentloaded', timeout: 60000 });
-            await page.waitForTimeout(3000);
+            await new Promise(resolve => setTimeout(resolve, 3000));
             
             console.log('Now navigating to press releases...');
             await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
@@ -217,7 +217,7 @@ export default async function (req, res) {
     console.log('Page loaded successfully');
     
     // Add another small delay to simulate human behavior
-    await page.waitForTimeout(Math.random() * 1000 + 500); // 0.5-1.5 second delay
+    await new Promise(resolve => setTimeout(resolve, Math.random() * 1000 + 500)); // 0.5-1.5 second delay
     
     // Execute JavaScript to further mask automation
     await page.evaluateOnNewDocument(() => {
