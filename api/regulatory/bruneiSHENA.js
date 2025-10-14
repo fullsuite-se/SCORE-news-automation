@@ -84,49 +84,49 @@ export default async function handler(req, res) {
     //**REPLACE STARTING HERE**
 
     const scrapedData = await page.evaluate((maxArticles) => {
-            const results = [];
-            // Find all elements that represent an article container.
-            // <--- REPLACE THIS SELECTOR with the actual article container selector
-            const articleElements = document.querySelectorAll('div.grid > div');
+      const results = [];
+      // Find all elements that represent an article container.
+      // <--- REPLACE THIS SELECTOR with the actual article container selector
+      const articleElements = document.querySelectorAll('div.main-content > div > div.grid > div');
 
-            if (articleElements.length === 0) {
-                console.warn("DIAGNOSTIC (Inner): No <article> elements found with the specified main selector ('.view-content > div.views-row > article').");
-                console.warn("DIAGNOSTIC (Inner): Please ensure this selector is correct and the content is loaded on the page.");
-                return [];
-            } else {
-                console.log(`DIAGNOSTIC (Inner): Found ${articleElements.length} potential article elements.`);
-            }
+      if (articleElements.length === 0) {
+          console.warn("DIAGNOSTIC (Inner): No <article> elements found with the specified main selector ('.view-content > div.views-row > article').");
+          console.warn("DIAGNOSTIC (Inner): Please ensure this selector is correct and the content is loaded on the page.");
+          return [];
+      } else {
+          console.log(`DIAGNOSTIC (Inner): Found ${articleElements.length} potential article elements.`);
+      }
 
-            for (let i = 0; i < Math.min(articleElements.length, maxArticles); i++) {
-                const articleElement = articleElements[i];
+      for (let i = 0; i < Math.min(articleElements.length, maxArticles); i++) {
+          const articleElement = articleElements[i];
 
 
-                // Extract Title
-                // <--- REPLACE THIS SELECTOR
-                const titleElement = articleElement.querySelector('div.h-full > div.flex > a > h4');
-                const title = titleElement ? titleElement.innerText.trim() : 'N/A';
+          // Extract Title
+          // <--- REPLACE THIS SELECTOR
+          const titleElement = articleElement.querySelector('div.h-full > div.flex > a > h4');
+          const title = titleElement ? titleElement.innerText.trim() : 'N/A';
 
-                // Extract Date
-                // <--- REPLACE THIS SELECTOR
-                const dateElement = articleElement.querySelector('div.h-full > div.flex > a > p');
-                const date = dateElement ? dateElement.innerText.trim() : 'N/A'
+          // Extract Date
+          // <--- REPLACE THIS SELECTOR
+          const dateElement = articleElement.querySelector('div.h-full > div.flex > a > p');
+          const date = dateElement ? dateElement.innerText.trim() : 'N/A'
 
-                // Extract Link
-                // <--- REPLACE THIS SELECTOR
-                const linkElement = articleElement.querySelector('a');
-                // Use window.location.origin to ensure absolute URLs
-                const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
+          // Extract Link
+          // <--- REPLACE THIS SELECTOR
+          const linkElement = articleElement.querySelector('a');
+          // Use window.location.origin to ensure absolute URLs
+          const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
 
-                results.push({
-                    title: title,
-                    url: link,
-                    date: date,
-                });
-            }
-            return results;
-        }, maxArticles); // Pass maxArticles to the page.evaluate context
+          results.push({
+              title: title,
+              url: link,
+              date: date,
+          });
+      }
+      return results;
+  }, maxArticles); // Pass maxArticles to the page.evaluate context
 
-        articles.push(...scrapedData);
+  articles.push(...scrapedData);
 
     //**UNTIL HERE**
 

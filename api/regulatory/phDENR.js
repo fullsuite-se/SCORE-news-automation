@@ -79,7 +79,16 @@ export default async function (req, res) {
         headless: "new", // Set to true for consistency, or false for local visual debugging
         defaultViewport: null,
         slowMo: 50,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-infobars',
+            '--window-position=0,0',
+            '--ignore-certifcate-errors',
+            '--ignore-certifcate-errors-spki-list',
+            '--disable-speech-api',
+            '--disable-features=site-per-process'
+        ],
         executablePath: executablePath,
       };
   let browser;
@@ -91,7 +100,34 @@ export default async function (req, res) {
     console.log('Attempting to launch Puppeteer with options:', JSON.stringify(launchOptions, null, 2));
     browser = await puppeteer.launch(launchOptions);
     const page = await browser.newPage();
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    
+    // Set a default timeout for navigation (e.g., 60 seconds)
+    page.setDefaultNavigationTimeout(60000);
+
+    // Optional: Set a realistic user agent
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+    
+    // Handle cookie consent (OneTrust) similar to working local script
+    const acceptButtonSelector = 'button#onetrust-accept-btn-handler';
+    const cookieBannerSelector = 'div.ot-sdk-container';
+    try {
+        await page.waitForSelector(acceptButtonSelector, { visible: true, timeout: 5000 });
+        await page.click(acceptButtonSelector);
+        await page.waitForSelector(cookieBannerSelector, { hidden: true, timeout: 5000 });
+        // Reload after accepting cookies to ensure content loads
+        await page.reload({ waitUntil: 'networkidle2' });
+    } catch (_) {
+        // No cookie banner or it disappeared; continue
+    }
+
+    // Wait for the container and ensure results are populated (site loads via JS)
+    await page.waitForSelector('div#main-content', { timeout: 15000 });
+    await page.waitForFunction(() => {
+        const container = document.querySelector('div#main-content');
+        return !!container && container.querySelectorAll('div.press-releases-container').length > 0;
+    }, { timeout: 20000 });
    
     //**REPLACE STARTING HERE**
     
