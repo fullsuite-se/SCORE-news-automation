@@ -101,36 +101,87 @@ export default async function (req, res) {
     browser = await puppeteer.launch(launchOptions);
     const page = await browser.newPage();
     
-    // Set a default timeout for navigation (e.g., 60 seconds)
-    page.setDefaultNavigationTimeout(60000);
+    // Set longer timeouts for serverless environment
+    page.setDefaultNavigationTimeout(120000); // 2 minutes
+    page.setDefaultTimeout(120000); // 2 minutes for all operations
 
     // Optional: Set a realistic user agent
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
     
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+    console.log('Navigating to URL:', url);
+    
+    // Try different wait strategies for serverless environment
+    try {
+        await page.goto(url, { waitUntil: 'networkidle2', timeout: 120000 });
+        console.log('Page loaded with networkidle2');
+    } catch (error) {
+        console.log('networkidle2 failed, trying domcontentloaded:', error.message);
+        try {
+            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 120000 });
+            console.log('Page loaded with domcontentloaded');
+            // Wait a bit more for dynamic content
+            await page.waitForTimeout(5000);
+        } catch (error2) {
+            console.log('domcontentloaded failed, trying load:', error2.message);
+            await page.goto(url, { waitUntil: 'load', timeout: 120000 });
+            console.log('Page loaded with load');
+            // Wait more for dynamic content
+            await page.waitForTimeout(10000);
+        }
+    }
+    
+    console.log('Page loaded successfully');
     
     // Handle cookie consent (OneTrust) similar to working local script
     const acceptButtonSelector = 'button#onetrust-accept-btn-handler';
     const cookieBannerSelector = 'div.ot-sdk-container';
     try {
-        await page.waitForSelector(acceptButtonSelector, { visible: true, timeout: 5000 });
+        console.log('Looking for cookie banner...');
+        await page.waitForSelector(acceptButtonSelector, { visible: true, timeout: 10000 });
+        console.log('Cookie banner found, clicking accept...');
         await page.click(acceptButtonSelector);
-        await page.waitForSelector(cookieBannerSelector, { hidden: true, timeout: 5000 });
+        await page.waitForSelector(cookieBannerSelector, { hidden: true, timeout: 10000 });
+        console.log('Cookie banner dismissed, reloading page...');
         // Reload after accepting cookies to ensure content loads
-        await page.reload({ waitUntil: 'networkidle2' });
-    } catch (_) {
+        await page.reload({ waitUntil: 'networkidle2', timeout: 120000 });
+    } catch (error) {
+        console.log('No cookie banner found or error handling cookies:', error.message);
         // No cookie banner or it disappeared; continue
     }
 
     // Wait for the container and ensure results are populated (site loads via JS)
-    await page.waitForSelector('div#main-content', { timeout: 15000 });
-    await page.waitForFunction(() => {
-        const container = document.querySelector('div#main-content');
-        return !!container && container.querySelectorAll('div.press-releases-container').length > 0;
-    }, { timeout: 20000 });
+    console.log('Waiting for main content container...');
+    try {
+        await page.waitForSelector('div#main-content', { timeout: 30000 });
+        console.log('Main content container found');
+        
+        console.log('Waiting for press releases to load...');
+        await page.waitForFunction(() => {
+            const container = document.querySelector('div#main-content');
+            return !!container && container.querySelectorAll('div.press-releases-container').length > 0;
+        }, { timeout: 45000 });
+        console.log('Press releases loaded successfully');
+    } catch (error) {
+        console.error('Error waiting for content to load:', error.message);
+        // Try to continue anyway and see what we can scrape
+        console.log('Attempting to scrape with whatever content is available...');
+        
+        // Additional fallback: wait for any content to appear and then proceed
+        try {
+            console.log('Waiting for any content to appear...');
+            await page.waitForFunction(() => {
+                const body = document.body;
+                return body && body.innerHTML.length > 1000; // Wait for substantial content
+            }, { timeout: 20000 });
+            console.log('Content appears to be loaded, proceeding with scraping...');
+        } catch (fallbackError) {
+            console.log('Fallback wait also failed, proceeding anyway:', fallbackError.message);
+        }
+    }
    
-    //**REPLACE STARTING HERE**
+    //**SCRAPING SECTION**
     
+    console.log('Starting to scrape articles...');
     const scrapedData = await page.evaluate((maxArticles) => {
             const results = [];
             // Find all elements that represent an article container.
@@ -138,9 +189,104 @@ export default async function (req, res) {
             const articleElements = document.querySelectorAll('div#main-content > div.three_fourth > div.press-releases-container');
 
             if (articleElements.length === 0) {
-                console.warn("DIAGNOSTIC (Inner): No <article> elements found with the specified main selector ('.view-content > div.views-row > article').");
-                console.warn("DIAGNOSTIC (Inner): Please ensure this selector is correct and the content is loaded on the page.");
-                return [];
+                console.warn("DIAGNOSTIC (Inner): No article elements found with the specified main selector.");
+                console.warn("DIAGNOSTIC (Inner): Checking for alternative selectors...");
+                
+                // Try alternative selectors as fallback
+                const altSelectors = [
+                    'div#main-content div.press-releases-container',
+                    'div.press-releases-container',
+                    'div#main-content .press-release',
+                    'div#main-content article',
+                    'div#main-content .news-item'
+                ];
+                
+                let foundElements = null;
+                for (const selector of altSelectors) {
+                    foundElements = document.querySelectorAll(selector);
+                    if (foundElements.length > 0) {
+                        console.log(`DIAGNOSTIC (Inner): Found ${foundElements.length} elements with alternative selector: ${selector}`);
+                        break;
+                    }
+                }
+                
+                if (!foundElements || foundElements.length === 0) {
+                    console.warn("DIAGNOSTIC (Inner): No elements found with any selector. Page content:");
+                    console.warn("DIAGNOSTIC (Inner): Main content HTML:", document.querySelector('div#main-content')?.innerHTML?.substring(0, 500) || 'No main content found');
+                    return [];
+                }
+                
+                // Use the found elements
+                for (let i = 0; i < Math.min(foundElements.length, maxArticles); i++) {
+                    const articleElement = foundElements[i];
+                    
+                    // Try multiple selectors for each field
+                    const titleSelectors = [
+                        'div.press-release-fr > div.news-title',
+                        '.news-title',
+                        'h2, h3, h4',
+                        'a[href*="/news-events/"]'
+                    ];
+                    
+                    const dateSelectors = [
+                        'div.news-date',
+                        '.news-date',
+                        '.date',
+                        '[class*="date"]'
+                    ];
+                    
+                    const linkSelectors = [
+                        'div.press-release-fr > div.news-title > a',
+                        '.news-title a',
+                        'a[href*="/news-events/"]',
+                        'a'
+                    ];
+                    
+                    let title = 'N/A';
+                    let date = 'N/A';
+                    let link = 'N/A';
+                    
+                    // Find title
+                    for (const selector of titleSelectors) {
+                        const element = articleElement.querySelector(selector);
+                        if (element && element.innerText.trim()) {
+                            title = element.innerText.trim();
+                            break;
+                        }
+                    }
+                    
+                    // Find date
+                    for (const selector of dateSelectors) {
+                        const element = articleElement.querySelector(selector);
+                        if (element && element.innerText.trim()) {
+                            date = element.innerText.trim();
+                            break;
+                        }
+                    }
+                    
+                    // Find link
+                    for (const selector of linkSelectors) {
+                        const element = articleElement.querySelector(selector);
+                        if (element && element.getAttribute('href')) {
+                            try {
+                                link = new URL(element.getAttribute('href'), window.location.origin).href;
+                                break;
+                            } catch (e) {
+                                link = element.getAttribute('href');
+                            }
+                        }
+                    }
+
+                    if (title !== 'N/A' || link !== 'N/A') {
+                        results.push({
+                            title: title,
+                            url: link,
+                            date: date,
+                        });
+                    }
+                }
+                
+                return results;
             } else {
                 console.log(`DIAGNOSTIC (Inner): Found ${articleElements.length} potential article elements.`);
             }
@@ -148,19 +294,15 @@ export default async function (req, res) {
             for (let i = 0; i < Math.min(articleElements.length, maxArticles); i++) {
                 const articleElement = articleElements[i];
 
-
                 // Extract Title
-                // <--- REPLACE THIS SELECTOR
                 const titleElement = articleElement.querySelector('div.press-release-fr > div.news-title');
                 const title = titleElement ? titleElement.innerText.trim() : 'N/A';
 
                 // Extract Date
-                // <--- REPLACE THIS SELECTOR
                 const dateElement = articleElement.querySelector('div.news-date');
                 const date = dateElement ? dateElement.innerText.trim() : 'N/A'
 
                 // Extract Link
-                // <--- REPLACE THIS SELECTOR
                 const linkElement = articleElement.querySelector('div.press-release-fr > div.news-title > a');
                 // Use window.location.origin to ensure absolute URLs
                 const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
@@ -174,6 +316,7 @@ export default async function (req, res) {
             return results;
         }, maxArticles); // Pass maxArticles to the page.evaluate context
 
+        console.log(`Scraped ${scrapedData.length} articles`);
         articles.push(...scrapedData);
 
     //**UNTIL HERE**
