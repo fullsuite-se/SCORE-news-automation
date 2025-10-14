@@ -182,6 +182,90 @@ export default async function (req, res) {
     //**SCRAPING SECTION**
     
     console.log('Starting to scrape articles...');
+    
+    // Add comprehensive diagnostic logging
+    const pageInfo = await page.evaluate(() => {
+        const info = {
+            url: window.location.href,
+            title: document.title,
+            bodyLength: document.body ? document.body.innerHTML.length : 0,
+            mainContent: null,
+            pressReleases: null,
+            allSelectors: {},
+            pageHTML: document.documentElement.outerHTML.substring(0, 2000) // First 2000 chars
+        };
+        
+        // Check main content
+        const mainContent = document.querySelector('div#main-content');
+        if (mainContent) {
+            info.mainContent = {
+                exists: true,
+                innerHTML: mainContent.innerHTML.substring(0, 1000),
+                children: Array.from(mainContent.children).map(child => ({
+                    tagName: child.tagName,
+                    className: child.className,
+                    id: child.id
+                }))
+            };
+        }
+        
+        // Check for press releases
+        const pressReleases = document.querySelectorAll('div.press-releases-container');
+        info.pressReleases = {
+            count: pressReleases.length,
+            elements: Array.from(pressReleases).map(el => ({
+                tagName: el.tagName,
+                className: el.className,
+                innerHTML: el.innerHTML.substring(0, 500)
+            }))
+        };
+        
+        // Test various selectors
+        const selectors = [
+            'div#main-content',
+            'div#main-content > div.three_fourth',
+            'div#main-content > div.three_fourth > div.press-releases-container',
+            'div.press-releases-container',
+            'div#main-content div.press-releases-container',
+            '.press-release',
+            '.news-item',
+            'article'
+        ];
+        
+        selectors.forEach(selector => {
+            const elements = document.querySelectorAll(selector);
+            info.allSelectors[selector] = {
+                count: elements.length,
+                firstElement: elements[0] ? {
+                    tagName: elements[0].tagName,
+                    className: elements[0].className,
+                    innerHTML: elements[0].innerHTML.substring(0, 200)
+                } : null
+            };
+        });
+        
+        return info;
+    });
+    
+    console.log('=== PAGE DIAGNOSTIC INFO ===');
+    console.log('URL:', pageInfo.url);
+    console.log('Title:', pageInfo.title);
+    console.log('Body Length:', pageInfo.bodyLength);
+    console.log('Main Content:', JSON.stringify(pageInfo.mainContent, null, 2));
+    console.log('Press Releases:', JSON.stringify(pageInfo.pressReleases, null, 2));
+    console.log('All Selectors:', JSON.stringify(pageInfo.allSelectors, null, 2));
+    console.log('Page HTML Sample:', pageInfo.pageHTML);
+    console.log('=== END DIAGNOSTIC INFO ===');
+    
+    /* // Take a screenshot for debugging (optional - comment out if not needed)
+    try {
+        const screenshot = await page.screenshot({ fullPage: true, encoding: 'base64' });
+        console.log('Screenshot taken for debugging (base64 length):', screenshot.length);
+    } catch (screenshotError) {
+        console.log('Could not take screenshot:', screenshotError.message);
+    }
+    */
+    
     const scrapedData = await page.evaluate((maxArticles) => {
             const results = [];
             // Find all elements that represent an article container.
@@ -213,6 +297,42 @@ export default async function (req, res) {
                 if (!foundElements || foundElements.length === 0) {
                     console.warn("DIAGNOSTIC (Inner): No elements found with any selector. Page content:");
                     console.warn("DIAGNOSTIC (Inner): Main content HTML:", document.querySelector('div#main-content')?.innerHTML?.substring(0, 500) || 'No main content found');
+                    
+                    // Last resort: try to find any links that might be articles
+                    console.log("DIAGNOSTIC (Inner): Attempting last resort - finding all links...");
+                    const allLinks = document.querySelectorAll('a[href*="/news-events/"]');
+                    console.log(`DIAGNOSTIC (Inner): Found ${allLinks.length} news event links`);
+                    
+                    if (allLinks.length > 0) {
+                        for (let i = 0; i < Math.min(allLinks.length, maxArticles); i++) {
+                            const link = allLinks[i];
+                            const title = link.innerText.trim() || link.textContent.trim() || 'N/A';
+                            const url = link.getAttribute('href') || 'N/A';
+                            
+                            // Try to find a date near this link
+                            let date = 'N/A';
+                            let parent = link.parentElement;
+                            for (let j = 0; j < 5 && parent; j++) {
+                                const dateEl = parent.querySelector('.date, .news-date, [class*="date"]');
+                                if (dateEl && dateEl.innerText.trim()) {
+                                    date = dateEl.innerText.trim();
+                                    break;
+                                }
+                                parent = parent.parentElement;
+                            }
+                            
+                            if (title !== 'N/A' && url !== 'N/A') {
+                                results.push({
+                                    title: title,
+                                    url: url.startsWith('http') ? url : new URL(url, window.location.origin).href,
+                                    date: date,
+                                });
+                            }
+                        }
+                        console.log(`DIAGNOSTIC (Inner): Found ${results.length} articles via link scraping`);
+                        return results;
+                    }
+                    
                     return [];
                 }
                 
