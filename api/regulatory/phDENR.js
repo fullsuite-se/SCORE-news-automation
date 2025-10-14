@@ -70,8 +70,30 @@ export default async function (req, res) {
   }
   const launchOptions = isVercelEnvironment
     ? {
-        args: chromiumArgs,
-        defaultViewport: chromiumDefaultViewport,
+        args: [
+          ...chromiumArgs,
+          '--disable-blink-features=AutomationControlled',
+          '--disable-features=VizDisplayCompositor',
+          '--disable-ipc-flooding-protection',
+          '--disable-renderer-backgrounding',
+          '--disable-backgrounding-occluded-windows',
+          '--disable-client-side-phishing-detection',
+          '--disable-component-extensions-with-background-pages',
+          '--disable-default-apps',
+          '--disable-extensions',
+          '--disable-hang-monitor',
+          '--disable-prompt-on-repost',
+          '--disable-sync',
+          '--disable-translate',
+          '--metrics-recording-only',
+          '--no-first-run',
+          '--safebrowsing-disable-auto-update',
+          '--enable-automation',
+          '--password-store=basic',
+          '--use-mock-keychain',
+          '--window-size=1366,768'
+        ],
+        defaultViewport: chromiumDefaultViewport || { width: 1366, height: 768 },
         executablePath: executablePath,
         headless: "new", // Must be true for serverless environments
       }
@@ -87,7 +109,9 @@ export default async function (req, res) {
             '--ignore-certifcate-errors',
             '--ignore-certifcate-errors-spki-list',
             '--disable-speech-api',
-            '--disable-features=site-per-process'
+            '--disable-features=site-per-process',
+            '--disable-blink-features=AutomationControlled',
+            '--window-size=1366,768'
         ],
         executablePath: executablePath,
       };
@@ -105,32 +129,121 @@ export default async function (req, res) {
     page.setDefaultNavigationTimeout(120000); // 2 minutes
     page.setDefaultTimeout(120000); // 2 minutes for all operations
 
-    // Optional: Set a realistic user agent
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    // Set more realistic headers and viewport to avoid bot detection
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36');
+    
+    // Set viewport to a common desktop resolution
+    await page.setViewport({ width: 1366, height: 768, deviceScaleFactor: 1 });
+    
+    // Set additional headers to look more like a real browser
+    await page.setExtraHTTPHeaders({
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'DNT': '1',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+    });
     
     console.log('Navigating to URL:', url);
     
+    // Add a small delay to make it look more human-like
+    await page.waitForTimeout(Math.random() * 2000 + 1000); // 1-3 second random delay
+    
     // Try different wait strategies for serverless environment
     try {
-        await page.goto(url, { waitUntil: 'networkidle2', timeout: 120000 });
+        await page.goto(url, { 
+            waitUntil: 'networkidle2', 
+            timeout: 120000,
+            referer: 'https://www.google.com/' // Add referer to look more legitimate
+        });
         console.log('Page loaded with networkidle2');
     } catch (error) {
         console.log('networkidle2 failed, trying domcontentloaded:', error.message);
         try {
-            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 120000 });
+            await page.goto(url, { 
+                waitUntil: 'domcontentloaded', 
+                timeout: 120000,
+                referer: 'https://www.google.com/'
+            });
             console.log('Page loaded with domcontentloaded');
             // Wait a bit more for dynamic content
             await page.waitForTimeout(5000);
         } catch (error2) {
             console.log('domcontentloaded failed, trying load:', error2.message);
-            await page.goto(url, { waitUntil: 'load', timeout: 120000 });
+            await page.goto(url, { 
+                waitUntil: 'load', 
+                timeout: 120000,
+                referer: 'https://www.google.com/'
+            });
             console.log('Page loaded with load');
             // Wait more for dynamic content
             await page.waitForTimeout(10000);
         }
     }
     
+    // Check if we got blocked and try alternative approach
+    const currentTitle = await page.title();
+    if (currentTitle.includes('403') || currentTitle.includes('Forbidden')) {
+        console.log('Detected 403 error, trying alternative approach...');
+        
+        // Try with different headers and approach
+        await page.setExtraHTTPHeaders({
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Encoding': 'gzip, deflate',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Upgrade-Insecure-Requests': '1',
+        });
+        
+        // Try to go to the main site first, then navigate
+        try {
+            console.log('Trying to access main site first...');
+            await page.goto('https://denr.gov.ph/', { waitUntil: 'domcontentloaded', timeout: 60000 });
+            await page.waitForTimeout(3000);
+            
+            console.log('Now navigating to press releases...');
+            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+            console.log('Alternative navigation successful');
+        } catch (altError) {
+            console.log('Alternative approach also failed:', altError.message);
+        }
+    }
+    
     console.log('Page loaded successfully');
+    
+    // Add another small delay to simulate human behavior
+    await page.waitForTimeout(Math.random() * 1000 + 500); // 0.5-1.5 second delay
+    
+    // Execute JavaScript to further mask automation
+    await page.evaluateOnNewDocument(() => {
+        // Remove webdriver property
+        Object.defineProperty(navigator, 'webdriver', {
+            get: () => undefined,
+        });
+        
+        // Mock plugins
+        Object.defineProperty(navigator, 'plugins', {
+            get: () => [1, 2, 3, 4, 5],
+        });
+        
+        // Mock languages
+        Object.defineProperty(navigator, 'languages', {
+            get: () => ['en-US', 'en'],
+        });
+        
+        // Mock permissions
+        const originalQuery = window.navigator.permissions.query;
+        window.navigator.permissions.query = (parameters) => (
+            parameters.name === 'notifications' ?
+                Promise.resolve({ state: Notification.permission }) :
+                originalQuery(parameters)
+        );
+    });
     
     // Handle cookie consent (OneTrust) similar to working local script
     const acceptButtonSelector = 'button#onetrust-accept-btn-handler';
