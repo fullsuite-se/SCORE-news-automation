@@ -1,115 +1,172 @@
+
 const isVercelEnvironment = !!process.env.AWS_REGION;
 
 async function getBrowserModules() {
-  const puppeteer = await import('puppeteer-core');
-  const { default: ChromiumClass } = await import('@sparticuz/chromium');
+  if (isVercelEnvironment) {
+    const puppeteer = (await import('puppeteer-core')).default;
+    const { default: ChromiumClass } = await import('@sparticuz/chromium');
 
-  console.log('--- Debugging ChromiumClass object (Vercel) ---');
-  console.log('Type of ChromiumClass:', typeof ChromiumClass);
-  console.log('Keys of ChromiumClass:', Object.keys(ChromiumClass));
-  console.log('Full ChromiumClass object:', ChromiumClass);
-  console.log('ChromiumClass.executablePath is a function:', typeof ChromiumClass.executablePath === 'function');
-  console.log('ChromiumClass.args:', ChromiumClass.args);
-  console.log('ChromiumClass.defaultViewport:', ChromiumClass.defaultViewport);
-  console.log('--- End ChromiumClass Debug (Vercel) ---');
+    console.log('--- Debugging ChromiumClass object (Vercel Environment) ---');
+    console.log('Type of ChromiumClass:', typeof ChromiumClass);
+    console.log('ChromiumClass.executablePath is a function:', typeof ChromiumClass.executablePath === 'function');
+    console.log('ChromiumClass.args:', ChromiumClass.args);
+    console.log('ChromiumClass.defaultViewport:', ChromiumClass.defaultViewport);
+    console.log('--- End ChromiumClass Debug (Vercel Environment) ---');
 
-  let executablePathValue = null;
-  if (typeof ChromiumClass.executablePath === 'function') {
-    executablePathValue = await ChromiumClass.executablePath();
+    let executablePathValue = null;
+    if (typeof ChromiumClass.executablePath === 'function') {
+      executablePathValue = await ChromiumClass.executablePath();
+    } else {
+      executablePathValue = ChromiumClass.executablePath;
+    }
+
+    return {
+      puppeteer,
+      chromiumArgs: ChromiumClass.args,
+      chromiumDefaultViewport: ChromiumClass.defaultViewport,
+      executablePath: executablePathValue
+    };
   } else {
-    executablePathValue = ChromiumClass.executablePath;
+    const puppeteer = (await import('puppeteer')).default;
+    return {
+      puppeteer,
+      chromiumArgs: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'], 
+      chromiumDefaultViewport: null, 
+      executablePath: undefined 
+    };
   }
-
-  return {
-    puppeteer,
-    chromiumArgs: ChromiumClass.args,
-    chromiumDefaultViewport: ChromiumClass.defaultViewport,
-    executablePath: executablePathValue
-  };
 }
 
-export default async function (req, res) {
-  const { puppeteer, chromiumArgs, chromiumDefaultViewport, executablePath } = await getBrowserModules();
-
-  console.log('--- Puppeteer Launch Debug Info (Vercel) ---');
-  console.log('isVercelEnvironment:', isVercelEnvironment);
-  console.log('chromiumArgs (from @sparticuz/chromium):', chromiumArgs);
-  console.log('chromiumDefaultViewport (from @sparticuz/chromium):', chromiumDefaultViewport);
-  console.log('Executable Path (from @sparticuz/chromium):', executablePath);
-  console.log('--- End Debug Info (Vercel) ---');
-
-  if (isVercelEnvironment && (!executablePath || typeof executablePath !== 'string' || executablePath.trim() === '')) {
-    console.error('ERROR: In Vercel environment, executablePath is not valid:', executablePath);
-    return res.status(500).json({
-      error: 'Puppeteer launch failed: Missing or invalid Chromium executable path for Vercel environment.'
-    });
-  }
-
-  const launchOptions = isVercelEnvironment
-    ? {
-        args: chromiumArgs,
-        defaultViewport: chromiumDefaultViewport,
-        executablePath: executablePath,
-        headless: true,
-      }
-    : {
-        headless: true,
-        defaultViewport: null,
-        slowMo: 50,
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'],
-      };
-
-  let browser;
+export default async function handler(req, res) {
+  let browser; 
   const url = 'https://www.mee.gov.cn/ywdt/xwfb/';
 
   try {
-    console.log('Attempting to launch Puppeteer with options:', JSON.stringify(launchOptions, null, 2));
-    browser = await puppeteer.launch(launchOptions);
-    const page = await browser.newPage();
+    const { puppeteer, chromiumArgs, chromiumDefaultViewport, executablePath } = await getBrowserModules();
 
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    console.log('--- Puppeteer Launch Debug Info ---');
+    console.log('Is Vercel Environment:', isVercelEnvironment);
+    console.log('Chromium Args:', chromiumArgs);
+    console.log('Chromium Default Viewport:', chromiumDefaultViewport);
+    console.log('Executable Path:', executablePath);
+    console.log('--- End Debug Info ---');
 
-    await page.waitForSelector('li.skipAutoFix', { timeout: 10000 });
-
-    const articles = await page.evaluate(() => {
-      const nodes = document.querySelectorAll('li.skipAutoFix');
-      const seen = new Set();
-      const results = [];
-
-      nodes.forEach(node => {
-        const linkEl = node.querySelector('dd.skipAutoFix a.cjcx_biaob.skipAutoFix');
-        const dateEl = node.querySelector('dt span.cjcx_shijian');
-
-        if (linkEl && dateEl) {
-          const relativeUrl = linkEl.getAttribute('href');
-          const url = new URL(relativeUrl, window.location.origin).href;
-          const title = linkEl.innerText.trim();
-          const date = dateEl.innerText.trim();
-
-          if (!seen.has(url)) {
-            seen.add(url);
-            results.push({ title, date, url });
-          }
-        }
+    if (isVercelEnvironment && (!executablePath || typeof executablePath !== 'string' || executablePath.trim() === '')) {
+      console.error('ERROR: In Vercel environment, executablePath is not valid:', executablePath);
+      return res.status(500).json({
+        error: 'Puppeteer launch failed: Missing or invalid Chromium executable path for Vercel environment.'
       });
-
-      console.log(`Found ${results.length} articles on listing page.`);
-      return results.slice(0, 10);
-    });
-
-    if (articles.length === 0) {
-      console.warn('No articles found.');
-      return res.status(200).json({ message: 'No articles found' });
     }
 
-    console.log(`Returning ${articles.length} articles.`);
-    res.status(200).json(articles);
+    const launchOptions = isVercelEnvironment
+      ? {
+          args: chromiumArgs,           
+          defaultViewport: chromiumDefaultViewport, 
+          executablePath: executablePath, 
+          headless: true,               
+        }
+      : {
+          headless: true,               
+          defaultViewport: null,        
+          args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'], 
+        };
+
+    console.log('Attempting to launch Puppeteer with options:', JSON.stringify(launchOptions, null, 2));
+
+    browser = await puppeteer.launch(launchOptions);
+    const page = await browser.newPage();
+    const articles = [];
+    const maxArticles = 10;
+
+    console.log(`Navigating to ${url}...`);
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    
+    //**REPLACE STARTING HERE**
+
+    const scrapedData = await page.evaluate((maxArticles) => {
+      const results = [];
+      // Find all elements that represent an article container.
+      // <--- REPLACE THIS SELECTOR with the actual article container selector
+      const articleElements = document.querySelectorAll('ul#div > li');
+
+      if (articleElements.length === 0) {
+          console.warn("DIAGNOSTIC (Inner): No <article> elements found with the specified main selector.");
+          console.warn("DIAGNOSTIC (Inner): Please ensure this selector is correct and the content is loaded on the page.");
+          return [];
+      } else {
+          console.log(`DIAGNOSTIC (Inner): Found ${articleElements.length} potential article elements.`);
+      }
+
+      for (let i = 0; i < Math.min(articleElements.length, maxArticles); i++) {
+          const articleElement = articleElements[i];
+
+
+          // Extract Title
+          // <--- REPLACE THIS SELECTOR
+          const titleElement = articleElement.querySelector('dd.skipAutoFix > a');
+          const title = titleElement ? titleElement.innerText.trim() : 'N/A';
+
+          // Extract Date
+          // <--- REPLACE THIS SELECTOR
+          // const dateElement = articleElement.querySelector('span.Timestamp-template');
+          // const date = dateElement ? dateElement.innerText.trim() : 'N/A';
+          // const date = dateElement ? dateElement.getAttribute('data-timestamp') : 'N/A'
+          const dateContainer = articleElement.querySelector('div.cjcs_dtxx_list');
+          let date = 'N/A'; // Default value
+
+          // 2. Check if the container was found
+          if (dateContainer) {
+              // 3. Find the day and year-month parts inside the container
+              const dayElement = dateContainer.querySelector('strong');
+              const yearMonthElement = dateContainer.querySelector('span');
+
+              // 4. Check if both parts exist
+              if (dayElement && yearMonthElement) {
+                  const dayPart = dayElement.innerText.trim();           // "30"
+                  const yearMonthPart = yearMonthElement.innerText.trim(); // "2025-09"
+                  
+                  // 5. Combine them into the full date string
+                  date = `${yearMonthPart}-${dayPart}`; // "2025-09-30"
+              }
+          }
+
+          // Extract Link
+          // <--- REPLACE THIS SELECTOR
+          const linkElement = articleElement.querySelector('dd.skipAutoFix > a');
+          // Use window.location.origin to ensure absolute URLs
+          const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
+
+          results.push({
+              title: title,
+              url: link,
+              date: date,
+          });
+      }
+      return results;
+  }, maxArticles); // Pass maxArticles to the page.evaluate context
+
+  articles.push(...scrapedData);
+
+    //**UNTIL HERE**
+
+    if (articles.length === 0) {
+      console.log('No articles found.');
+      return res.status(200).json({
+        message: 'No articles found with the specified selectors.',
+      });
+    } else {
+      console.log(`Successfully scraped ${articles.length} articles.`);
+      return res.status(200).json(articles);
+    }
 
   } catch (err) {
-    console.error('Scraping failed:', err.message);
-    res.status(500).json({ error: 'Scraping failed', details: err.message });
+    console.error('Error during scraping:', err);
+    return res.status(500).json({
+      details: err.message || 'An unknown error occurred during scraping.'
+    });
   } finally {
     if (browser) {
+      console.log('Closing browser...');
       await browser.close();
     }
   }

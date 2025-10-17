@@ -1,171 +1,163 @@
-const isVercelEnvironment = !!process.env.AWS_REGION; 
 
-/**
- * Dynamically imports puppeteer-core and @sparticuz/chromium.
- * This function ensures the correct executable path is used for a headless
- * Chromium browser in serverless environments.
- * @returns {Promise<{puppeteer: object, chromiumArgs: string[], chromiumDefaultViewport: object, executablePath: string|null}>}
- */
+const isVercelEnvironment = !!process.env.AWS_REGION;
+
 async function getBrowserModules() {
-  const puppeteer = await import('puppeteer-core');
-  const { default: ChromiumClass } = await import('@sparticuz/chromium');
+  if (isVercelEnvironment) {
+    const puppeteer = (await import('puppeteer-core')).default;
+    const { default: ChromiumClass } = await import('@sparticuz/chromium');
 
-  console.log('--- Debugging ChromiumClass object (Vercel) ---');
-  console.log('Type of ChromiumClass:', typeof ChromiumClass);
-  console.log('Keys of ChromiumClass:', Object.keys(ChromiumClass));
-  console.log('Full ChromiumClass object:', ChromiumClass);
-  console.log('ChromiumClass.executablePath is a function:', typeof ChromiumClass.executablePath === 'function');
-  console.log('ChromiumClass.args:', ChromiumClass.args);
-  console.log('ChromiumClass.defaultViewport:', ChromiumClass.defaultViewport);
-  console.log('--- End ChromiumClass Debug (Vercel) ---');
+    console.log('--- Debugging ChromiumClass object (Vercel Environment) ---');
+    console.log('Type of ChromiumClass:', typeof ChromiumClass);
+    console.log('ChromiumClass.executablePath is a function:', typeof ChromiumClass.executablePath === 'function');
+    console.log('ChromiumClass.args:', ChromiumClass.args);
+    console.log('ChromiumClass.defaultViewport:', ChromiumClass.defaultViewport);
+    console.log('--- End ChromiumClass Debug (Vercel Environment) ---');
 
-  let executablePathValue = null;
-  if (typeof ChromiumClass.executablePath === 'function') {
-    executablePathValue = await ChromiumClass.executablePath();
+    let executablePathValue = null;
+    if (typeof ChromiumClass.executablePath === 'function') {
+      executablePathValue = await ChromiumClass.executablePath();
+    } else {
+      executablePathValue = ChromiumClass.executablePath;
+    }
+
+    return {
+      puppeteer,
+      chromiumArgs: ChromiumClass.args,
+      chromiumDefaultViewport: ChromiumClass.defaultViewport,
+      executablePath: executablePathValue
+    };
   } else {
-    executablePathValue = ChromiumClass.executablePath;
+    const puppeteer = (await import('puppeteer')).default;
+    return {
+      puppeteer,
+      chromiumArgs: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'], 
+      chromiumDefaultViewport: null, 
+      executablePath: undefined 
+    };
   }
-
-  return {
-    puppeteer,
-    chromiumArgs: ChromiumClass.args,
-    chromiumDefaultViewport: ChromiumClass.defaultViewport,
-    executablePath: executablePathValue
-  };
 }
 
-/**
- * Vercel Serverless Function for scraping articles from Semana Sostenible.
- * This function fetches article titles, URLs, and publication dates
- * from semana.com/sostenible.
- * @param {object} req - The Vercel request object.
- * @param {object} res - The Vercel response object.
- */
-export default async function (req, res) {
-  // Retrieve Puppeteer and Chromium configuration from the helper function.
-  const { puppeteer, chromiumArgs, chromiumDefaultViewport, executablePath } = await getBrowserModules();
-
-  // --- Crucial Debugging and Validation for Vercel ---
-  console.log('--- Puppeteer Launch Debug Info (Vercel) ---');
-  console.log('isVercelEnvironment:', isVercelEnvironment);
-  console.log('chromiumArgs (from @sparticuz/chromium):', chromiumArgs);
-  console.log('chromiumDefaultViewport (from @sparticuz/chromium):', chromiumDefaultViewport);
-  console.log('Executable Path (from @sparticuz/chromium):', executablePath);
-  console.log('--- End Debug Info (Vercel) ---');
-
-  // Validate that a valid executablePath is available when in a serverless environment.
-  if (isVercelEnvironment && (!executablePath || typeof executablePath !== 'string' || executablePath.trim() === '')) {
-    console.error('ERROR: In Vercel environment, executablePath is not valid:', executablePath);
-    return res.status(500).json({
-      error: 'Puppeteer launch failed: Missing or invalid Chromium executable path for Vercel environment.',
-      details: 'Ensure @sparticuz/chromium is correctly integrated and can locate the Chromium binary.'
-    });
-  }
-
-  // Configure Puppeteer launch options based on the environment.
-  const launchOptions = isVercelEnvironment
-    ? {
-        args: chromiumArgs, 
-        defaultViewport: chromiumDefaultViewport, 
-        executablePath: executablePath, 
-        headless: true, 
-      }
-    : {
-        
-        headless: true, 
-        slowMo: 50, 
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'], 
-      };
-
+export default async function handler(req, res) {
   let browser; 
-  const baseUrl = 'https://www.semana.com';
-  const url = `${baseUrl}/sostenible/`; // Target URL for scraping.
+  const url = 'https://www.semana.com/sostenible/';
 
   try {
-    console.log('Attempting to launch Puppeteer with options:', JSON.stringify(launchOptions, null, 2));
-    browser = await puppeteer.launch(launchOptions); // Launch the browser instance.
-    const page = await browser.newPage();
+    const { puppeteer, chromiumArgs, chromiumDefaultViewport, executablePath } = await getBrowserModules();
 
-    console.log('Navigating to Semana Sostenible page...');
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 }); // Navigate to the URL.
-    // Wait for a key selector to ensure content is loaded.
-    await page.waitForSelector('div.card-body', { timeout: 15000 });
+    console.log('--- Puppeteer Launch Debug Info ---');
+    console.log('Is Vercel Environment:', isVercelEnvironment);
+    console.log('Chromium Args:', chromiumArgs);
+    console.log('Chromium Default Viewport:', chromiumDefaultViewport);
+    console.log('Executable Path:', executablePath);
+    console.log('--- End Debug Info ---');
 
-    console.log('Extracting article links and titles...');
-    const rawArticles = await page.evaluate(() => {
-      const cards = Array.from(document.querySelectorAll('div.card-body'));
-      const seen = new Set(); // Use a Set to track seen URLs for deduplication.
-      const results = []; // Array to store the scraped articles.
-
-      cards.forEach(card => {
-        // Look for h2 elements with specific classes, then for an anchor tag within them.
-        const h2 = card.querySelector('h2.card-title.h2.semanaserif-extrabold, h2.card-title.h4');
-        const aTag = h2 ? h2.querySelector('a[href]') : null;
-
-        const url = aTag ? aTag.href.trim() : null;
-        const title = aTag ? aTag.textContent.trim() : null;
-
-        // Deduplicate based on a combined key of title and URL.
-        const key = `${title}||${url}`;
-        if (title && url && !seen.has(key)) {
-          seen.add(key); // Add new key to seen set.
-          results.push({ title, url }); // Add the article to results.
-        }
+    if (isVercelEnvironment && (!executablePath || typeof executablePath !== 'string' || executablePath.trim() === '')) {
+      console.error('ERROR: In Vercel environment, executablePath is not valid:', executablePath);
+      return res.status(500).json({
+        error: 'Puppeteer launch failed: Missing or invalid Chromium executable path for Vercel environment.'
       });
+    }
 
-      return results; // Return the deduplicated list of articles.
-    });
-
-    const detailedArticles = []; // Array to store articles with fetched dates.
-
-    // Loop through the raw articles, limiting to a maximum of 10, to get detailed info.
-    for (const article of rawArticles) {
-      if (detailedArticles.length >= 10) break; // Stop if 10 articles are already processed.
-
-      try {
-        const articlePage = await browser.newPage(); // Open a new page for each article.
-        // Navigate to the individual article URL.
-        await articlePage.goto(article.url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-
-        // Extract the publication date from the article page.
-        const date = await articlePage.evaluate(() => {
-          const dateContainer = document.querySelector('div.mb-5.text-xs.text-smoke-500'); // Date selector.
-          return dateContainer ? dateContainer.textContent.trim() : null; // Return trimmed text or null.
-        });
-
-        if (date) { // Only push if a date was found.
-          detailedArticles.push({ ...article, date }); // Add the date to the article object.
-        } else {
-          console.warn(`Date not found for article: ${article.url}`);
+    const launchOptions = isVercelEnvironment
+      ? {
+          args: chromiumArgs,           
+          defaultViewport: chromiumDefaultViewport, 
+          executablePath: executablePath, 
+          headless: true,               
         }
+      : {
+          headless: true,               
+          defaultViewport: null,        
+          args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-gpu'], 
+        };
 
-        await articlePage.close(); // Close the article page to save resources.
-      } catch (err) {
-        // Log a warning if an error occurs during date retrieval or page navigation.
-        console.warn(`Skipping article due to error: ${article.url}, Details: ${err.message}`);
-        // Optionally, you could still add the article with a 'Date not found' placeholder here
-        // if you want to include all articles regardless of date availability.
+    console.log('Attempting to launch Puppeteer with options:', JSON.stringify(launchOptions, null, 2));
+
+    browser = await puppeteer.launch(launchOptions);
+    const page = await browser.newPage();
+    const articles = [];
+    const maxArticles = 10;
+
+    console.log(`Navigating to ${url}...`);
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    
+    //**REPLACE STARTING HERE**
+
+    const scrapedData = await page.evaluate((maxArticles) => {
+      const results = [];
+      // Find all elements that represent an article container.
+      // <--- REPLACE THIS SELECTOR with the actual article container selector
+      const articleElements = document.querySelectorAll('div.card:has(h2.card-title > a)');
+
+      if (articleElements.length === 0) {
+          console.warn("DIAGNOSTIC (Inner): No <article> elements found with the specified main selector ('.view-content > div.views-row > article').");
+          console.warn("DIAGNOSTIC (Inner): Please ensure this selector is correct and the content is loaded on the page.");
+          return [];
+      } else {
+          console.log(`DIAGNOSTIC (Inner): Found ${articleElements.length} potential article elements.`);
       }
-    }
 
-    if (detailedArticles.length === 0) {
-      console.warn('No valid articles with dates found.');
-      return res.status(200).json({ message: 'No articles found or no dates could be retrieved.' });
-    }
+      for (let i = 0; i < Math.min(articleElements.length, maxArticles); i++) {
+          const articleElement = articleElements[i];
 
-    // Send the scraped and detailed articles as a JSON response.
-    res.status(200).json(detailedArticles);
+
+          // Extract Title
+          // <--- REPLACE THIS SELECTOR
+          const titleElement = articleElement.querySelector('h2.card-title > a');
+          const title = titleElement ? titleElement.textContent.trim() : 'N/A';
+          // const title = titleElement ? titleElement.innerText.trim() : 'N/A';
+
+          // Extract Date
+          // <--- REPLACE THIS SELECTOR
+          const dateElement = articleElement.querySelector('small.card-info');
+          const dateText = dateElement ? dateElement.textContent.trim() : ''; 
+
+          // Clean the date text. The <font> tags can add extra newlines.
+          // This finds the last piece of actual text.
+          const date = dateText.split('\n')      // Split by newlines
+                             .map(s => s.trim()) // Trim whitespace from each line
+                             .filter(Boolean)    // Remove empty strings
+                             .pop() || 'N/A';    // Get the last item, or 'N/A' if it was empty
+          // const date = dateElement ? dateElement.innerText.trim() : 'N/A'
+
+          // Extract Link
+          // <--- REPLACE THIS SELECTOR
+          const linkElement = articleElement.querySelector('h2.card-title > a');
+          // Use window.location.origin to ensure absolute URLs
+          const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
+
+          results.push({
+              title: title,
+              url: link,
+              date: date,
+          });
+      }
+      return results;
+  }, maxArticles); // Pass maxArticles to the page.evaluate context
+
+  articles.push(...scrapedData);
+
+    //**UNTIL HERE**
+
+    if (articles.length === 0) {
+      console.log('No articles found.');
+      return res.status(200).json({
+        message: 'No articles found with the specified selectors.',
+      });
+    } else {
+      console.log(`Successfully scraped ${articles.length} articles.`);
+      return res.status(200).json(articles);
+    }
 
   } catch (err) {
-    // Catch any errors during the scraping process or Puppeteer launch.
-    console.error('Error during scraping or Puppeteer launch:', err);
-    // Send a 500 Internal Server Error response.
-    res.status(500).json({ error: 'Scraping failed', details: err.message });
+    console.error('Error during scraping:', err);
+    return res.status(500).json({
+      details: err.message || 'An unknown error occurred during scraping.'
+    });
   } finally {
-    // Ensure the browser is closed even if an error occurs.
     if (browser) {
+      console.log('Closing browser...');
       await browser.close();
-      console.log('Browser closed.');
     }
   }
 }

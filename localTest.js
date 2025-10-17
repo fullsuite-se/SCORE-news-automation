@@ -71,10 +71,10 @@ async function scrapeArticlesWithPuppeteer(url) {
             const results = [];
             // Find all elements that represent an article container.
             // <--- REPLACE THIS SELECTOR with the actual article container selector
-            const articleElements = document.querySelectorAll('div.main-content > div > div.grid > div');
+            const articleElements = document.querySelectorAll('ul#div > li');
 
             if (articleElements.length === 0) {
-                console.warn("DIAGNOSTIC (Inner): No <article> elements found with the specified main selector ('.view-content > div.views-row > article').");
+                console.warn("DIAGNOSTIC (Inner): No <article> elements found with the specified main selector.");
                 console.warn("DIAGNOSTIC (Inner): Please ensure this selector is correct and the content is loaded on the page.");
                 return [];
             } else {
@@ -87,17 +87,36 @@ async function scrapeArticlesWithPuppeteer(url) {
 
                 // Extract Title
                 // <--- REPLACE THIS SELECTOR
-                const titleElement = articleElement.querySelector('div.h-full > div.flex > a > h4');
+                const titleElement = articleElement.querySelector('dd.skipAutoFix > a');
                 const title = titleElement ? titleElement.innerText.trim() : 'N/A';
 
                 // Extract Date
                 // <--- REPLACE THIS SELECTOR
-                const dateElement = articleElement.querySelector('div.h-full > div.flex > a > p');
-                const date = dateElement ? dateElement.innerText.trim() : 'N/A'
+                // const dateElement = articleElement.querySelector('span.Timestamp-template');
+                // const date = dateElement ? dateElement.innerText.trim() : 'N/A';
+                // const date = dateElement ? dateElement.getAttribute('data-timestamp') : 'N/A'
+                const dateContainer = articleElement.querySelector('div.cjcs_dtxx_list');
+                let date = 'N/A'; // Default value
+
+                // 2. Check if the container was found
+                if (dateContainer) {
+                    // 3. Find the day and year-month parts inside the container
+                    const dayElement = dateContainer.querySelector('strong');
+                    const yearMonthElement = dateContainer.querySelector('span');
+
+                    // 4. Check if both parts exist
+                    if (dayElement && yearMonthElement) {
+                        const dayPart = dayElement.innerText.trim();           // "30"
+                        const yearMonthPart = yearMonthElement.innerText.trim(); // "2025-09"
+                        
+                        // 5. Combine them into the full date string
+                        date = `${yearMonthPart}-${dayPart}`; // "2025-09-30"
+                    }
+                }
 
                 // Extract Link
                 // <--- REPLACE THIS SELECTOR
-                const linkElement = articleElement.querySelector('a');
+                const linkElement = articleElement.querySelector('dd.skipAutoFix > a');
                 // Use window.location.origin to ensure absolute URLs
                 const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
 
@@ -137,7 +156,7 @@ async function scrapeArticlesWithPuppeteer(url) {
 
 // --- Configuration ---
 // <--- REPLACE THIS WITH THE ACTUAL URL OF THE WEBSITE YOU WANT TO SCRAPE
-const targetUrl = 'https://denr.gov.ph/news-events-category/press-releases/';
+const targetUrl = 'https://www.mee.gov.cn/ywdt/xwfb/';
 
 // --- Run the scraper ---
 scrapeArticlesWithPuppeteer(targetUrl)
