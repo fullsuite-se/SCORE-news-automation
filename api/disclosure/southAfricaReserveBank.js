@@ -136,16 +136,6 @@ export default async function (req, res) {
   }, maxArticles); // Pass maxArticles to the page.evaluate context
 
   articles.push(...scrapedData);
-
-  console.log(`Successfully scraped ${articles.length} articles:`);
-  console.table(articles);
-
-  // --- Save articles to a JSON file ---
-  const outputFileName = 'articles.json';
-  fs.writeFileSync(outputFileName, JSON.stringify(articles, null, 2));
-  console.log(`Articles saved to ${outputFileName}`);
-
-  return articles;
     //**UNTIL HERE**
         
     if (articles.length === 0) {

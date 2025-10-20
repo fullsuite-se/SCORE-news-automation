@@ -71,55 +71,34 @@ async function scrapeArticlesWithPuppeteer(url) {
             const results = [];
             // Find all elements that represent an article container.
             // <--- REPLACE THIS SELECTOR with the actual article container selector
-            const articleElements = document.querySelectorAll('ul#div > li');
-
+            // const articleElements = document.querySelectorAll('ul > li');
+            const articleElements = document.querySelectorAll('div.col-12 > div.news-box');
+      
             if (articleElements.length === 0) {
-                console.warn("DIAGNOSTIC (Inner): No <article> elements found with the specified main selector.");
-                console.warn("DIAGNOSTIC (Inner): Please ensure this selector is correct and the content is loaded on the page.");
+                console.warn("No article container elements found with the provided selector. Please check your selector.");
                 return [];
-            } else {
-                console.log(`DIAGNOSTIC (Inner): Found ${articleElements.length} potential article elements.`);
             }
-
+      
             for (let i = 0; i < Math.min(articleElements.length, maxArticles); i++) {
                 const articleElement = articleElements[i];
-
-
+      
                 // Extract Title
                 // <--- REPLACE THIS SELECTOR
-                const titleElement = articleElement.querySelector('dd.skipAutoFix > a');
+                const titleElement = articleElement.querySelector('h5 > a');
                 const title = titleElement ? titleElement.innerText.trim() : 'N/A';
-
+      
                 // Extract Date
                 // <--- REPLACE THIS SELECTOR
-                // const dateElement = articleElement.querySelector('span.Timestamp-template');
-                // const date = dateElement ? dateElement.innerText.trim() : 'N/A';
-                // const date = dateElement ? dateElement.getAttribute('data-timestamp') : 'N/A'
-                const dateContainer = articleElement.querySelector('div.cjcs_dtxx_list');
-                let date = 'N/A'; // Default value
-
-                // 2. Check if the container was found
-                if (dateContainer) {
-                    // 3. Find the day and year-month parts inside the container
-                    const dayElement = dateContainer.querySelector('strong');
-                    const yearMonthElement = dateContainer.querySelector('span');
-
-                    // 4. Check if both parts exist
-                    if (dayElement && yearMonthElement) {
-                        const dayPart = dayElement.innerText.trim();           // "30"
-                        const yearMonthPart = yearMonthElement.innerText.trim(); // "2025-09"
-                        
-                        // 5. Combine them into the full date string
-                        date = `${yearMonthPart}-${dayPart}`; // "2025-09-30"
-                    }
-                }
-
+                const dateElement = articleElement.querySelector('p.news-date');
+                const date = dateElement ? dateElement.innerText.trim() : 'N/A'
+                // const date = dateElement ? dateElement.getAttribute('datetime') : 'N/A'
+      
                 // Extract Link
                 // <--- REPLACE THIS SELECTOR
-                const linkElement = articleElement.querySelector('dd.skipAutoFix > a');
+                const linkElement = articleElement.querySelector('h5 > a');
                 // Use window.location.origin to ensure absolute URLs
                 const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
-
+      
                 results.push({
                     title: title,
                     url: link,
@@ -128,7 +107,7 @@ async function scrapeArticlesWithPuppeteer(url) {
             }
             return results;
         }, maxArticles); // Pass maxArticles to the page.evaluate context
-
+      
         articles.push(...scrapedData);
 
         console.log("DIAGNOSTIC (Outer): Article data extraction finished.");
@@ -156,7 +135,7 @@ async function scrapeArticlesWithPuppeteer(url) {
 
 // --- Configuration ---
 // <--- REPLACE THIS WITH THE ACTUAL URL OF THE WEBSITE YOU WANT TO SCRAPE
-const targetUrl = 'https://www.mee.gov.cn/ywdt/xwfb/';
+const targetUrl = 'https://socpa.org.sa/Socpa/Media-Center/News.aspx';
 
 // --- Run the scraper ---
 scrapeArticlesWithPuppeteer(targetUrl)
