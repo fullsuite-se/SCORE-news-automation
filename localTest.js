@@ -71,34 +71,36 @@ async function scrapeArticlesWithPuppeteer(url) {
             const results = [];
             // Find all elements that represent an article container.
             // <--- REPLACE THIS SELECTOR with the actual article container selector
-            // const articleElements = document.querySelectorAll('ul > li');
-            const articleElements = document.querySelectorAll('div.col-12 > div.news-box');
-      
+            const articleElements = document.querySelectorAll('div#newslisting > div.col-container');
+
             if (articleElements.length === 0) {
-                console.warn("No article container elements found with the provided selector. Please check your selector.");
+                console.warn("DIAGNOSTIC (Inner): No <article> elements found with the specified main selector.");
+                console.warn("DIAGNOSTIC (Inner): Please ensure this selector is correct and the content is loaded on the page.");
                 return [];
+            } else {
+                console.log(`DIAGNOSTIC (Inner): Found ${articleElements.length} potential article elements.`);
             }
-      
+
             for (let i = 0; i < Math.min(articleElements.length, maxArticles); i++) {
                 const articleElement = articleElements[i];
-      
+
+
                 // Extract Title
                 // <--- REPLACE THIS SELECTOR
-                const titleElement = articleElement.querySelector('h5 > a');
+                const titleElement = articleElement.querySelector('div.card > div.card-body > h3 > a');
                 const title = titleElement ? titleElement.innerText.trim() : 'N/A';
-      
+                
                 // Extract Date
                 // <--- REPLACE THIS SELECTOR
-                const dateElement = articleElement.querySelector('p.news-date');
+                const dateElement = articleElement.querySelector('div.card > div.card-body > div.dateRow > div.my-1 > span');
                 const date = dateElement ? dateElement.innerText.trim() : 'N/A'
-                // const date = dateElement ? dateElement.getAttribute('datetime') : 'N/A'
-      
+
                 // Extract Link
                 // <--- REPLACE THIS SELECTOR
-                const linkElement = articleElement.querySelector('h5 > a');
+                const linkElement = articleElement.querySelector('div.card > div.card-body > h3 > a');
                 // Use window.location.origin to ensure absolute URLs
                 const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
-      
+
                 results.push({
                     title: title,
                     url: link,
@@ -107,8 +109,9 @@ async function scrapeArticlesWithPuppeteer(url) {
             }
             return results;
         }, maxArticles); // Pass maxArticles to the page.evaluate context
-      
+
         articles.push(...scrapedData);
+
 
         console.log("DIAGNOSTIC (Outer): Article data extraction finished.");
 
@@ -135,7 +138,7 @@ async function scrapeArticlesWithPuppeteer(url) {
 
 // --- Configuration ---
 // <--- REPLACE THIS WITH THE ACTUAL URL OF THE WEBSITE YOU WANT TO SCRAPE
-const targetUrl = 'https://socpa.org.sa/Socpa/Media-Center/News.aspx';
+const targetUrl = 'https://www.mol.gov.qa/ar/mediacenter/Pages/News.aspx';
 
 // --- Run the scraper ---
 scrapeArticlesWithPuppeteer(targetUrl)

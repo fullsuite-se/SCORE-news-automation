@@ -53,10 +53,10 @@ async function scrapeArticlesWithPuppeteer(url) {
         }
 
         // Wait for the container and ensure results are populated (site loads via JS)
-        await page.waitForSelector('div#main-content', { timeout: 15000 });
+        await page.waitForSelector('p#sustainability-announcements-list', { timeout: 15000 });
         await page.waitForFunction(() => {
-            const container = document.querySelector('div#main-content');
-            return !!container && container.querySelectorAll('div.press-releases-container').length > 0;
+            const container = document.querySelector('p#sustainability-announcements-list');
+            return !!container && container.querySelectorAll('div.sustainability-announcement-item-bar').length > 0;
         }, { timeout: 20000 });
 
         // Optional: Wait for specific elements to appear if content loads dynamically
@@ -68,36 +68,47 @@ async function scrapeArticlesWithPuppeteer(url) {
             const results = [];
             // Find all elements that represent an article container.
             // <--- REPLACE THIS SELECTOR with the actual article container selector
-            const articleElements = document.querySelectorAll('div#main-content > div.three_fourth > div.press-releases-container');
-
+            // const articleElements = document.querySelectorAll('ul > li');
+            const articleElements = document.querySelectorAll('p#sustainability-announcements-list > div.sustainability-announcement-item-bar');
+    
             if (articleElements.length === 0) {
-                console.warn("DIAGNOSTIC (Inner): No <article> elements found with the specified main selector ('.view-content > div.views-row > article').");
-                console.warn("DIAGNOSTIC (Inner): Please ensure this selector is correct and the content is loaded on the page.");
+                console.warn("No article container elements found with the provided selector. Please check your selector.");
                 return [];
-            } else {
-                console.log(`DIAGNOSTIC (Inner): Found ${articleElements.length} potential article elements.`);
             }
-
+    
             for (let i = 0; i < Math.min(articleElements.length, maxArticles); i++) {
                 const articleElement = articleElements[i];
-
-
+    
                 // Extract Title
                 // <--- REPLACE THIS SELECTOR
-                const titleElement = articleElement.querySelector('div.press-release-fr > div.news-title');
+                const titleElement = articleElement.querySelector('a');
                 const title = titleElement ? titleElement.innerText.trim() : 'N/A';
-
-                // Extract Date
+    
+                // Extract Date from separate day, month, year elements
                 // <--- REPLACE THIS SELECTOR
-                const dateElement = articleElement.querySelector('div.news-date');
-                const date = dateElement ? dateElement.innerText.trim() : 'N/A'
-
+                const dateContainer = articleElement.querySelector('.sustainability-announcement-item-date');
+                let date = 'N/A';
+                
+                if (dateContainer) {
+                    const dayElement = dateContainer.querySelector('.sustainability-announcement-item-date-day');
+                    const monthElement = dateContainer.querySelector('.sustainability-announcement-item-date-month');
+                    const yearElement = dateContainer.querySelector('.sustainability-announcement-item-date-year');
+                    
+                    const day = dayElement ? dayElement.innerText.trim() : '';
+                    const month = monthElement ? monthElement.innerText.trim() : '';
+                    const year = yearElement ? yearElement.innerText.trim() : '';
+                    
+                    if (day && month && year) {
+                        date = `${day} ${month} ${year}`;
+                    }
+                }
+    
                 // Extract Link
                 // <--- REPLACE THIS SELECTOR
-                const linkElement = articleElement.querySelector('div.press-release-fr > div.news-title > a');
+                const linkElement = articleElement.querySelector('a');
                 // Use window.location.origin to ensure absolute URLs
                 const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
-
+    
                 results.push({
                     title: title,
                     url: link,
@@ -106,8 +117,9 @@ async function scrapeArticlesWithPuppeteer(url) {
             }
             return results;
         }, maxArticles); // Pass maxArticles to the page.evaluate context
-
+    
         articles.push(...scrapedData);
+
 
         console.log(`Successfully scraped ${articles.length} articles:`);
         console.table(articles);
@@ -133,7 +145,7 @@ async function scrapeArticlesWithPuppeteer(url) {
 
 // --- Configuration ---
 // <--- REPLACE THIS WITH THE ACTUAL URL OF THE WEBSITE YOU WANT TO SCRAPE
-const targetUrl = 'https://denr.gov.ph/news-events-category/press-releases/';
+const targetUrl = 'https://www.kgk.gov.tr/surdurulebilirlik-duyurular';
 
 // --- Run the scraper ---
 scrapeArticlesWithPuppeteer(targetUrl)
