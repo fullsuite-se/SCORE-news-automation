@@ -67,7 +67,7 @@ export default async function (req, res) {
     return res.status(500).json({
       error: 'Puppeteer launch failed: Missing or invalid Chromium executable path for Vercel environment.'
     });
-  }ß
+  }
   const launchOptions = isVercelEnvironment
     ? {
         args: chromiumArgs,
