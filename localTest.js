@@ -71,7 +71,7 @@ async function scrapeArticlesWithPuppeteer(url) {
             const results = [];
             // Find all elements that represent an article container.
             // <--- REPLACE THIS SELECTOR with the actual article container selector
-            const articleElements = document.querySelectorAll('div#newslisting > div.col-container');
+            const articleElements = document.querySelectorAll('ul.gem-c-document-list > li.gem-c-document-list__item');
 
             if (articleElements.length === 0) {
                 console.warn("DIAGNOSTIC (Inner): No <article> elements found with the specified main selector.");
@@ -87,17 +87,17 @@ async function scrapeArticlesWithPuppeteer(url) {
 
                 // Extract Title
                 // <--- REPLACE THIS SELECTOR
-                const titleElement = articleElement.querySelector('div.card > div.card-body > h3 > a');
+                const titleElement = articleElement.querySelector('div.gem-c-document-list__item-title > a');
                 const title = titleElement ? titleElement.innerText.trim() : 'N/A';
                 
                 // Extract Date
                 // <--- REPLACE THIS SELECTOR
-                const dateElement = articleElement.querySelector('div.card > div.card-body > div.dateRow > div.my-1 > span');
-                const date = dateElement ? dateElement.innerText.trim() : 'N/A'
+                const dateElement = articleElement.querySelector('ul.gem-c-document-list__item-metadata > li > time');
+                const date = dateElement ? dateElement.getAttribute('datetime') : 'N/A'
 
                 // Extract Link
                 // <--- REPLACE THIS SELECTOR
-                const linkElement = articleElement.querySelector('div.card > div.card-body > h3 > a');
+                const linkElement = articleElement.querySelector('div.gem-c-document-list__item-title > a');
                 // Use window.location.origin to ensure absolute URLs
                 const link = linkElement ? new URL(linkElement.getAttribute('href'), window.location.origin).href : 'N/A';
 
@@ -138,7 +138,7 @@ async function scrapeArticlesWithPuppeteer(url) {
 
 // --- Configuration ---
 // <--- REPLACE THIS WITH THE ACTUAL URL OF THE WEBSITE YOU WANT TO SCRAPE
-const targetUrl = 'https://www.mol.gov.qa/ar/mediacenter/Pages/News.aspx';
+const targetUrl = 'https://www.gov.uk/search/all?parent=department-for-energy-security-and-net-zero&order=updated-newest&content_purpose_supergroup%5B%5D=guidance_and_regulation&content_purpose_supergroup%5B%5D=policy_and_engagement&organisations%5B%5D=department-for-energy-security-and-net-zero';
 
 // --- Run the scraper ---
 scrapeArticlesWithPuppeteer(targetUrl)
